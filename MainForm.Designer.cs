@@ -2,6 +2,10 @@
 
 partial class MainForm
 {
+    TextBox statusBox; 
+    TextBox lastCommandReceived;
+    TextBox lastCommandSent;
+    
     /// <summary>
     ///  Required designer variable.
     /// </summary>
@@ -32,6 +36,34 @@ partial class MainForm
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
         this.ClientSize = new System.Drawing.Size(800, 450);
         this.Text = "Media Controller";
+
+        statusBox = new TextBox();
+        statusBox.Location = new Point(30, 50);
+        statusBox.Width = 150;
+        statusBox.Visible = true;
+        statusBox.Text = "Created";
+        statusBox.ReadOnly = true;
+        statusBox.Enabled = false;
+        Controls.Add(statusBox);
+
+        lastCommandReceived = new TextBox();
+        lastCommandReceived.Location = new Point(30, 80);
+        lastCommandReceived.Width = 150;
+        lastCommandReceived.Visible = true;
+        lastCommandReceived.Text = "No commands received";
+        lastCommandReceived.ReadOnly = true;
+        lastCommandReceived.Enabled = false;
+        Controls.Add(lastCommandReceived);
+
+        lastCommandSent = new TextBox();
+        lastCommandSent.Location = new Point(30, 110);
+        lastCommandSent.Width = 150;
+        lastCommandSent.Visible = true;
+        lastCommandSent.Text = "No commands sent";
+        lastCommandSent.ReadOnly = true;
+        lastCommandSent.Enabled = false;
+        Controls.Add(lastCommandSent);
+
     }
 
     #endregion

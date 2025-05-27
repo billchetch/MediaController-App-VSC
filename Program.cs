@@ -12,8 +12,6 @@ static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         MediaControllerContext context = new MediaControllerContext();
 
-        //context.Init();
-
         //SysTray (comment out below and uncomment this section to run as a syst tray app)
         Application.Run(context);
 
