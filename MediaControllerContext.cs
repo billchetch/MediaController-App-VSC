@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Chetch.Windows;
+using Chetch.ChetchXMPP;
 
 namespace MediaController;
 
@@ -22,6 +23,8 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Constants and static methods and fields
     //const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "PlexMediaPlayer";
     const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "notepad";
+    const String CXMPP_USERNAME = "bbmedia.client@openfire.bb.lan";
+    const String CXMPP_PASSWORD = "bbmedia";
 
     static String? PathToMediaPlayer = "C:/Program Files/Plex/Plex Media Player/PlexMediaPlayer.exe";
 
@@ -43,7 +46,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         bool newProcess = false;
         var process = GetMediaPlayerProcess();
 
-        if (process == null)
+        if (process == null && PathToMediaPlayer != null)
         {
             String cmd = PathToMediaPlayer;
             process = Process.Start(cmd);
@@ -66,13 +69,26 @@ public class MediaControllerContext : SysTrayApplicationContext
         SwitchToThisWindow(process.MainWindowHandle, true);
         SetForegroundWindow(process.MainWindowHandle);
 
+        MediaPlayerActive = true;
+
         return !newProcess;
     }
+
+    static bool MediaPlayerActive = false;
     #endregion
+
+    ChetchXMPPConnection cnn = new ChetchXMPPConnection(CXMPP_USERNAME, CXMPP_PASSWORD);
+
+    MainForm? mainForm;
 
     protected override Form CreateMainForm()
     {
-        return new MainForm();
+        mainForm = new MainForm();
+        mainForm.Activated += (sender, eargs) =>
+        {
+            Console.WriteLine("Activated");
+        };
+        return mainForm;
     }
 
     #region Init and End
@@ -87,10 +103,27 @@ public class MediaControllerContext : SysTrayApplicationContext
 
         base.InitializeContext(asSysTray);
 
+        //set up timer
+
+        //Connect client
+        try
+        {
+            cnn.ConnectAsync();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
     }
 
     protected override void ExitThreadCore()
     {
+        try
+        {
+            cnn.DisconnectAsync();
+        }
+        catch { };
+
         base.ExitThreadCore();
     }
     #endregion
