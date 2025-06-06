@@ -17,9 +17,5 @@ static class Program
 
         //Normal winform (comment out above and uncomment this section to run as a normal form app)
         //Application.Run(new MainForm());
-
-        //end of both
-        //context.End();
-        System.Threading.Thread.Sleep(1000);
     }    
 }
