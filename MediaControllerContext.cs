@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Chetch.Windows;
 using Chetch.ChetchXMPP;
+using Microsoft.Extensions.Configuration;
+using Chetch.Arduino;
 
 namespace MediaController;
 
@@ -77,9 +79,15 @@ public class MediaControllerContext : SysTrayApplicationContext
     static bool MediaPlayerActive = false;
     #endregion
 
+    #region Fields
     ChetchXMPPConnection cnn = new ChetchXMPPConnection(CXMPP_USERNAME, CXMPP_PASSWORD);
 
     MainForm? mainForm;
+
+    System.Timers.Timer timer = new System.Timers.Timer();
+
+    ArduinoBoard board = new ArduinoBoard("mc");
+    #endregion
 
     protected override Form CreateMainForm()
     {
@@ -94,9 +102,9 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Init and End
     override protected void InitializeContext(bool asSysTray)
     {
-        if (Config.ContainsKey("PathToMediaPlayer") && Config["PathToMediaPlayer"] != null)
+        if(Config != null && Config.GetSection("PathToMediaPlayer") != null)
         {
-            PathToMediaPlayer = Config["PathToMediaPlayer"].ToString();
+            PathToMediaPlayer = Config.GetSection("PathToMediaPlayer").ToString();
         }
         NotifyIconPath = "icon-white.ico";
         NotifyIconText = "Media Controller";
@@ -104,6 +112,13 @@ public class MediaControllerContext : SysTrayApplicationContext
         base.InitializeContext(asSysTray);
 
         //set up timer
+        timer.AutoReset = true;
+        timer.Interval = 5000;
+        timer.Elapsed += (sender, eargs) =>
+        {
+
+        };
+        timer.Start();
 
         //Connect client
         try
@@ -113,6 +128,41 @@ public class MediaControllerContext : SysTrayApplicationContext
         catch (Exception e)
         {
             Console.WriteLine(e.Message);
+        }
+
+        //Connect arduino board
+        if (Config != null && Config.GetSection("Arduino").Exists())
+        {
+            var cnnConfig = Config.GetSection("Arduino").GetSection("Connection");
+            try
+            {
+                var path2device = cnnConfig["PathToDevice"];
+                if (path2device == null) throw new Exception("No path to device found");
+                int baudRate = System.Convert.ToInt32(cnnConfig["BaudRate"]);
+                board.Connection = new ArduinoSerialConnection(path2device.ToString(), baudRate);
+
+                board.Ready += (sender, ready) =>
+                {
+
+                };
+
+                //Handle errors either thrown or generated from the board by just logging them
+                board.ErrorReceived += (sender, errorArgs) =>
+                {
+
+                };
+                board.ExceptionThrown += (sender, errorArgs) =>
+                {
+
+                };
+
+                //Now begin
+                board.Begin();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
         }
     }
 
