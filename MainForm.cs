@@ -7,7 +7,7 @@ public partial class MainForm : Form
         InitializeComponent();
     }
 
-    void updateStatus(String text)
+    public void UpdateStatus(String text)
     {
         if (statusBox != null)
         {

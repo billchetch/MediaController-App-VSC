@@ -6,6 +6,8 @@ using Chetch.Windows;
 using Chetch.ChetchXMPP;
 using Microsoft.Extensions.Configuration;
 using Chetch.Arduino;
+using System.Reflection.Metadata.Ecma335;
+using System.Text;
 
 namespace MediaController;
 
@@ -25,8 +27,6 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Constants and static methods and fields
     //const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "PlexMediaPlayer";
     const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "notepad";
-    const String CXMPP_USERNAME = "bbmedia.client@openfire.bb.lan";
-    const String CXMPP_PASSWORD = "bbmedia";
 
     static String? PathToMediaPlayer = "C:/Program Files/Plex/Plex Media Player/PlexMediaPlayer.exe";
 
@@ -79,8 +79,38 @@ public class MediaControllerContext : SysTrayApplicationContext
     static bool MediaPlayerActive = false;
     #endregion
 
+    #region Properties
+    public String StatusReport
+    {
+        get
+        {
+            StringBuilder builder = new StringBuilder();
+            if (cnn != null)
+            {
+                builder.AppendFormat("{0}: {1}", cnn.Username, cnn.CurrentState.ToString());
+                builder.AppendLine();
+            }
+            if (board != null)
+            {
+                if (board.IsReady)
+                {
+                    builder.AppendFormat("{0} is ready", board.SID);
+                    builder.AppendLine();
+                    builder.AppendFormat("Free memory: {0}", board.FreeMemory);
+                }
+                else
+                {
+                    builder.AppendFormat("{0} is not ready", board.SID);
+                }
+                builder.AppendLine();
+            }
+            return builder.ToString();
+        }
+    }
+    #endregion
+
     #region Fields
-    ChetchXMPPConnection cnn = new ChetchXMPPConnection(CXMPP_USERNAME, CXMPP_PASSWORD);
+    ChetchXMPPConnection? cnn = null;
 
     MainForm? mainForm;
 
@@ -94,8 +124,9 @@ public class MediaControllerContext : SysTrayApplicationContext
         mainForm = new MainForm();
         mainForm.Activated += (sender, eargs) =>
         {
-            Console.WriteLine("Activated");
+            mainForm.UpdateStatus(StatusReport);
         };
+        
         return mainForm;
     }
 
@@ -116,18 +147,30 @@ public class MediaControllerContext : SysTrayApplicationContext
         timer.Interval = 5000;
         timer.Elapsed += (sender, eargs) =>
         {
-
+            if (Form.ActiveForm == mainForm && mainForm != null)
+            {
+                mainForm.UpdateStatus(StatusReport);
+            }
         };
         timer.Start();
 
         //Connect client
-        try
+        if (Config != null && Config.GetSection("Credentials").Exists())
         {
-            cnn.ConnectAsync();
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.Message);
+            var creds = Config.GetSection("Credentials");
+            var un = creds["Username"];
+            var pw = creds["Password"];
+            if (un == null || pw == null) throw new Exception("Username and/or password cannot be null");
+
+            cnn = new ChetchXMPPConnection(un.ToString(), pw.ToString());
+            try
+            {
+                cnn.ConnectAsync();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
         }
 
         //Connect arduino board

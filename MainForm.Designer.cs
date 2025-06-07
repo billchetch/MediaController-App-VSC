@@ -39,10 +39,12 @@ partial class MainForm
 
         statusBox = new TextBox();
         statusBox.Location = new Point(30, 50);
-        statusBox.Width = 150;
+        statusBox.Width = 600;
+        statusBox.Height = 80;
         statusBox.Visible = true;
-        statusBox.Text = "Created";
+        statusBox.Text = "--";
         statusBox.ReadOnly = true;
+        statusBox.Multiline = true;
         statusBox.Enabled = false;
         Controls.Add(statusBox);
 
