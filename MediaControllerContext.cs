@@ -8,6 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Chetch.Arduino;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
+using Chetch.Arduino.Devices;
+using System.Threading.Tasks;
+using Chetch.Arduino.Devices.Infrared;
 
 namespace MediaController;
 
@@ -112,11 +115,14 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Fields
     ChetchXMPPConnection? cnn = null;
 
+    Dictionary<String, IRData>? lgCommands;
+
     MainForm? mainForm;
 
     System.Timers.Timer timer = new System.Timers.Timer();
 
     ArduinoBoard board = new ArduinoBoard("mc");
+    Ticker ticker = new Ticker(10, "ticker");
     #endregion
 
     protected override Form CreateMainForm()
@@ -126,14 +132,50 @@ public class MediaControllerContext : SysTrayApplicationContext
         {
             mainForm.UpdateStatus(StatusReport);
         };
-        
+
         return mainForm;
     }
 
-    #region Init and End
-    override protected void InitializeContext(bool asSysTray)
+    async Task<Dictionary<String, IRData>> getIRCommands(String deviceName, String uri)
     {
-        if(Config != null && Config.GetSection("PathToMediaPlayer") != null)
+        //TODO: from here should be a func
+        String filename = String.Format("ircommands.{0}.json", deviceName.ToLower().Replace(" ", "-"));
+        String json = String.Empty;
+
+        if (File.Exists(filename))
+        {
+            json = File.ReadAllText(filename);
+        }
+        else
+        {
+            await Task.Run(async () =>
+            {
+                HttpClient client = new HttpClient();
+                var response = await client.GetAsync(uri);
+                json = await response.Content.ReadAsStringAsync();
+
+                if (!String.IsNullOrEmpty(json))
+                {
+                    File.WriteAllText(filename, json);
+                }
+            });
+        }
+
+        if (String.IsNullOrEmpty(json))
+        {
+            throw new Exception(String.Format("No commands found for device: {0}", deviceName));
+        }
+        var result = JsonSerializer.Deserialize<List<IRData>>(json);
+        if (result == null) throw new Exception("No result from json deserialize");
+
+        return result.ToDictionary(x => x.CommandAlias, x => x);
+    }
+
+
+    #region Init and End
+    override protected async void InitializeContext(bool asSysTray)
+    {
+        if (Config != null && Config.GetSection("PathToMediaPlayer") != null)
         {
             PathToMediaPlayer = Config.GetSection("PathToMediaPlayer").ToString();
         }
@@ -154,58 +196,118 @@ public class MediaControllerContext : SysTrayApplicationContext
         };
         timer.Start();
 
-        //Connect client
-        if (Config != null && Config.GetSection("Credentials").Exists())
+        //Load IR Commands
+        try
         {
-            var creds = Config.GetSection("Credentials");
-            var un = creds["Username"];
-            var pw = creds["Password"];
-            if (un == null || pw == null) throw new Exception("Username and/or password cannot be null");
+            if (Config != null && Config.GetSection("IRCommands").Exists())
+            {
+                var irc = Config.GetSection("IRCommands");
+                var uri = irc["URI"];
+                if (uri == null)
+                {
+                    throw new Exception("No URI found for IR Commands");
+                }
 
-            cnn = new ChetchXMPPConnection(un.ToString(), pw.ToString());
-            try
-            {
-                cnn.ConnectAsync();
+                String deviceName = "LG Home Theater";
+                uri = String.Format(uri, deviceName);
+                Console.WriteLine("Getting commands for device {0} using URI: {1}", deviceName, uri);
+                lgCommands = await getIRCommands(deviceName, uri);
             }
-            catch (Exception e)
+            else
             {
-                Console.WriteLine(e.Message);
+                throw new Exception("Cannot find IRCommands entry in app config");
             }
+        }
+        catch (Exception e)
+        {
+            //Status update failed to get IR Commands
+            Console.WriteLine(e.Message);
+        }
+
+
+        //Connect XMPP client
+        try
+        {
+            if (Config != null && Config.GetSection("Credentials").Exists())
+            {
+                var creds = Config.GetSection("Credentials");
+                var un = creds["Username"];
+                var pw = creds["Password"];
+                if (un == null || pw == null) throw new Exception("Username and/or password cannot be null");
+
+                cnn = new ChetchXMPPConnection(un.ToString(), pw.ToString());
+                try
+                {
+                    cnn.ConnectAsync();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+            else
+            {
+                throw new Exception("Cannot find XMPP credentials etry in app config");
+            }
+        }
+        catch (Exception e)
+        {
+            //
         }
 
         //Connect arduino board
-        if (Config != null && Config.GetSection("Arduino").Exists())
+        try
         {
-            var cnnConfig = Config.GetSection("Arduino").GetSection("Connection");
-            try
+            if (Config != null && Config.GetSection("Arduino").Exists())
             {
-                var path2device = cnnConfig["PathToDevice"];
-                if (path2device == null) throw new Exception("No path to device found");
-                int baudRate = System.Convert.ToInt32(cnnConfig["BaudRate"]);
-                board.Connection = new ArduinoSerialConnection(path2device.ToString(), baudRate);
-
-                board.Ready += (sender, ready) =>
+                var cnnConfig = Config.GetSection("Arduino").GetSection("Connection");
+                try
                 {
+                    //Add devices
+                    /*board.AddDevice(ticker);
+                    ticker.Ticked += (sender, count) =>
+                    {
+                        Console.WriteLine("Ticker ticked: {0}", count);
+                    };*/
 
-                };
+                    //Connection
+                    var path2device = cnnConfig["PathToDevice"];
+                    if (path2device == null) throw new Exception("No path to device found");
+                    int baudRate = System.Convert.ToInt32(cnnConfig["BaudRate"]);
+                    board.Connection = new ArduinoSerialConnection(path2device.ToString(), baudRate);
 
-                //Handle errors either thrown or generated from the board by just logging them
-                board.ErrorReceived += (sender, errorArgs) =>
+                    //Event handlers
+                    board.Ready += (sender, ready) =>
+                    {
+                        Console.WriteLine("Board is ready");
+                    };
+
+                    //Handle errors either thrown or generated from the board by just logging them
+                    board.ErrorReceived += (sender, errorArgs) =>
+                    {
+
+                    };
+                    board.ExceptionThrown += (sender, errorArgs) =>
+                    {
+
+                    };
+
+                    //Now begin
+                    board.Begin();
+                }
+                catch (Exception e)
                 {
-
-                };
-                board.ExceptionThrown += (sender, errorArgs) =>
-                {
-
-                };
-
-                //Now begin
-                board.Begin();
+                    Console.WriteLine(e.Message);
+                }
             }
-            catch (Exception e)
+            else
             {
-                Console.WriteLine(e.Message);
+                throw new Exception("Cannot find Arduino setion in app config");
             }
+        }
+        catch (Exception e)
+        {
+            //Status for arduino board connetion 
         }
     }
 
@@ -213,9 +315,14 @@ public class MediaControllerContext : SysTrayApplicationContext
     {
         try
         {
-            cnn.DisconnectAsync();
+            cnn?.DisconnectAsync();
+
+            board?.End();
+
+            Thread.Sleep(1000);
         }
-        catch { };
+        catch { }
+        ;
 
         base.ExitThreadCore();
     }
