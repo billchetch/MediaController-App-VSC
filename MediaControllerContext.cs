@@ -87,32 +87,58 @@ public class MediaControllerContext : SysTrayApplicationContext
     {
         get
         {
-            StringBuilder builder = new StringBuilder();
-            if (cnn != null)
+            try
             {
-                builder.AppendFormat("{0}: {1}", cnn.Username, cnn.CurrentState.ToString());
-                builder.AppendLine();
-            }
-            if (board != null)
-            {
-                if (board.IsReady)
+                StringBuilder builder = new StringBuilder();
+                if (cnn != null)
                 {
-                    builder.AppendFormat("{0} is ready", board.SID);
+                    builder.AppendFormat("{0}: {1}", cnn.Username, cnn.CurrentState.ToString());
                     builder.AppendLine();
-                    builder.AppendFormat("Free memory: {0}", board.FreeMemory);
+                }
+                if (board != null)
+                {
+                    if (board.IsReady)
+                    {
+                        builder.AppendFormat("{0} is ready", board.SID);
+                        builder.AppendLine();
+                        builder.AppendFormat("Free memory: {0}", board.FreeMemory);
+                    }
+                    else
+                    {
+                        builder.AppendFormat("{0} is not ready", board.SID);
+                    }
+                    builder.AppendLine();
+                }
+                if (lgCommands != null)
+                {
+                    builder.AppendFormat("Loaded {0} LG IRCommands", lgCommands.Count);
+                    builder.AppendLine();
+                }
+                if (errors.Count > 0)
+                {
+                    builder.AppendLine("ERRORS!");
+                    foreach (var kv in errors)
+                    {
+                        builder.AppendFormat("{0} : {1}", kv.Key, kv.Value);
+                    }
                 }
                 else
                 {
-                    builder.AppendFormat("{0} is not ready", board.SID);
+                    builder.AppendLine("No errors");
                 }
-                builder.AppendLine();
+                return builder.ToString();
             }
-            return builder.ToString();
+            catch (Exception e)
+            {
+                return e.Message;
+            }
         }
     }
     #endregion
 
     #region Fields
+    Dictionary<String, String> errors = new Dictionary<String, String>();
+
     ChetchXMPPConnection? cnn = null;
 
     Dictionary<String, IRData>? lgCommands;
@@ -122,7 +148,6 @@ public class MediaControllerContext : SysTrayApplicationContext
     System.Timers.Timer timer = new System.Timers.Timer();
 
     ArduinoBoard board = new ArduinoBoard("mc");
-    Ticker ticker = new Ticker(10, "ticker");
     #endregion
 
     protected override Form CreateMainForm()
@@ -221,9 +246,8 @@ public class MediaControllerContext : SysTrayApplicationContext
         catch (Exception e)
         {
             //Status update failed to get IR Commands
-            Console.WriteLine(e.Message);
+            errors["IRCommands"] = e.Message;
         }
-
 
         //Connect XMPP client
         try
@@ -238,7 +262,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 cnn = new ChetchXMPPConnection(un.ToString(), pw.ToString());
                 try
                 {
-                    cnn.ConnectAsync();
+                    _ = cnn.ConnectAsync();
                 }
                 catch (Exception e)
                 {
@@ -252,7 +276,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         }
         catch (Exception e)
         {
-            //
+            errors["XMPP"] = e.Message;
         }
 
         //Connect arduino board
@@ -264,12 +288,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 try
                 {
                     //Add devices
-                    /*board.AddDevice(ticker);
-                    ticker.Ticked += (sender, count) =>
-                    {
-                        Console.WriteLine("Ticker ticked: {0}", count);
-                    };*/
-
+                    
                     //Connection
                     var path2device = cnnConfig["PathToDevice"];
                     if (path2device == null) throw new Exception("No path to device found");
@@ -285,11 +304,11 @@ public class MediaControllerContext : SysTrayApplicationContext
                     //Handle errors either thrown or generated from the board by just logging them
                     board.ErrorReceived += (sender, errorArgs) =>
                     {
-
+                        errors["Arduino"] = errorArgs.ErrorMessage.ToString();
                     };
                     board.ExceptionThrown += (sender, errorArgs) =>
                     {
-
+                        errors["Arduino"] = errorArgs.GetException().Message;
                     };
 
                     //Now begin
@@ -297,7 +316,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.Message);
+                    errors["Arduino"] = e.Message;
                 }
             }
             else
@@ -307,7 +326,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         }
         catch (Exception e)
         {
-            //Status for arduino board connetion 
+            errors["Arduino"] = e.Message;
         }
     }
 

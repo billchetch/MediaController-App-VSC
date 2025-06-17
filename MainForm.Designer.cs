@@ -3,8 +3,11 @@
 partial class MainForm
 {
     TextBox statusBox; 
-    TextBox lastCommandReceived;
-    TextBox lastCommandSent;
+    TextBox xmppMessaging;
+    TextBox arduinoMessaging;
+    ComboBox devices;
+    ComboBox commands;
+    Button sendButton;
     
     /// <summary>
     ///  Required designer variable.
@@ -34,12 +37,24 @@ partial class MainForm
     {
         this.components = new System.ComponentModel.Container();
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(800, 450);
+        this.ClientSize = new System.Drawing.Size(650, 400);
         this.Text = "Media Controller";
 
+        int xPos = 35;
+        int yPos = 15;
+        int yPad1 = 0;
+        int yPad2 = 12;
+
+        var lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.Text = "Status";
+        lbl.AutoSize = true;
+        lbl.Location = new Point(xPos, yPos);
+        Controls.Add(lbl);
+
         statusBox = new TextBox();
-        statusBox.Location = new Point(30, 50);
-        statusBox.Width = 600;
+        statusBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
+        statusBox.Width = 500;
         statusBox.Height = 80;
         statusBox.Visible = true;
         statusBox.Text = "--";
@@ -48,24 +63,72 @@ partial class MainForm
         statusBox.Enabled = false;
         Controls.Add(statusBox);
 
-        lastCommandReceived = new TextBox();
-        lastCommandReceived.Location = new Point(30, 80);
-        lastCommandReceived.Width = 150;
-        lastCommandReceived.Visible = true;
-        lastCommandReceived.Text = "No commands received";
-        lastCommandReceived.ReadOnly = true;
-        lastCommandReceived.Enabled = false;
-        Controls.Add(lastCommandReceived);
 
-        lastCommandSent = new TextBox();
-        lastCommandSent.Location = new Point(30, 110);
-        lastCommandSent.Width = 150;
-        lastCommandSent.Visible = true;
-        lastCommandSent.Text = "No commands sent";
-        lastCommandSent.ReadOnly = true;
-        lastCommandSent.Enabled = false;
-        Controls.Add(lastCommandSent);
+        lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.Text = "XMPP Messaging";
+        lbl.AutoSize = true;
+        lbl.Location = new Point(xPos, statusBox.Location.Y + statusBox.Height + yPad2);
+        Controls.Add(lbl);
 
+        xmppMessaging = new TextBox();
+        xmppMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
+        xmppMessaging.Width = 500;
+        xmppMessaging.Height = 40;
+        xmppMessaging.Multiline = true;
+        xmppMessaging.Visible = true;
+        xmppMessaging.Text = "No commands received or sent";
+        xmppMessaging.ReadOnly = true;
+        xmppMessaging.Enabled = false;
+        Controls.Add(xmppMessaging);
+
+        lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.AutoSize = true;
+        lbl.Text = "Arduino Messaging";
+        lbl.Location = new Point(xPos, xmppMessaging.Location.Y + xmppMessaging.Height + yPad2);
+        Controls.Add(lbl);
+
+        arduinoMessaging = new TextBox();
+        arduinoMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
+        arduinoMessaging.Width = 500;
+        arduinoMessaging.Height = 40;
+        arduinoMessaging.Multiline = true;
+        arduinoMessaging.Visible = true;
+        arduinoMessaging.Text = "No commands received or sent";
+        arduinoMessaging.ReadOnly = true;
+        arduinoMessaging.Enabled = false;
+        Controls.Add(arduinoMessaging);
+
+
+        lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.AutoSize = true;
+        lbl.Text = "Send IR Command";
+        lbl.Location = new Point(xPos, arduinoMessaging.Location.Y + arduinoMessaging.Height + yPad2);
+        Controls.Add(lbl);
+
+        devices = new ComboBox();
+        devices.Location = new Point(xPos, lbl.Location.Y + lbl.Height + 4);
+        devices.Width = 100;
+        devices.Enabled = true;
+        Controls.Add(devices);
+
+        commands = new ComboBox();
+        commands.Location = new Point(devices.Location.X + devices.Width + 8, devices.Location.Y);
+        commands.Width = 200;
+        commands.Enabled = true;
+        Controls.Add(commands);
+
+        sendButton = new Button();
+        sendButton.Location = new Point(commands.Location.X + commands.Width + 8, commands.Location.Y);
+        sendButton.Text = "Send";
+        sendButton.Enabled = true;
+        sendButton.Click += (sender, eargs) =>
+        {
+            MessageBox.Show("Oh boy clicked", "Wow!", MessageBoxButtons.OK);
+        };
+        Controls.Add(sendButton);
     }
 
     #endregion
