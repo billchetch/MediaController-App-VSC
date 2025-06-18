@@ -25,6 +25,12 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     [DllImport("user32.dll")]
     private static extern void SwitchToThisWindow(IntPtr hWnd, bool fAltTab);
+
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+    
+    [DllImport("user32.dll")]
+    static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
     #endregion
 
     #region Constants and static methods and fields
@@ -408,7 +414,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         {
             throw new Exception("Arduino board not connected");
         }
-        
+
     }
     #endregion
 }
