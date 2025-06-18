@@ -2,12 +2,7 @@
 
 partial class MainForm
 {
-    TextBox statusBox; 
-    TextBox xmppMessaging;
-    TextBox arduinoMessaging;
-    ComboBox devices;
-    ComboBox commands;
-    Button sendButton;
+    
     
     /// <summary>
     ///  Required designer variable.
@@ -55,9 +50,10 @@ partial class MainForm
         statusBox = new TextBox();
         statusBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
         statusBox.Width = 500;
-        statusBox.Height = 80;
+        statusBox.Height = 100;
         statusBox.Visible = true;
         statusBox.Text = "--";
+        //statusBox.BorderStyle = BorderStyle.FixedSingle;
         statusBox.ReadOnly = true;
         statusBox.Multiline = true;
         statusBox.Enabled = false;
@@ -112,22 +108,20 @@ partial class MainForm
         devices.Location = new Point(xPos, lbl.Location.Y + lbl.Height + 4);
         devices.Width = 100;
         devices.Enabled = true;
+        devices.DropDownStyle = ComboBoxStyle.DropDownList;
         Controls.Add(devices);
 
         commands = new ComboBox();
         commands.Location = new Point(devices.Location.X + devices.Width + 8, devices.Location.Y);
         commands.Width = 200;
         commands.Enabled = true;
+        commands.DropDownStyle = ComboBoxStyle.DropDownList;
         Controls.Add(commands);
 
         sendButton = new Button();
         sendButton.Location = new Point(commands.Location.X + commands.Width + 8, commands.Location.Y);
         sendButton.Text = "Send";
         sendButton.Enabled = true;
-        sendButton.Click += (sender, eargs) =>
-        {
-            MessageBox.Show("Oh boy clicked", "Wow!", MessageBoxButtons.OK);
-        };
         Controls.Add(sendButton);
     }
 

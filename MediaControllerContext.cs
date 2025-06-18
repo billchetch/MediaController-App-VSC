@@ -46,6 +46,11 @@ public class MediaControllerContext : SysTrayApplicationContext
         }
     }
 
+    static bool IsMediaPlayerRunning()
+    {
+        return GetMediaPlayerProcess() != null;
+    }
+
     static bool ActivateMediaPlayer()
     {
         bool newProcess = false;
@@ -114,6 +119,11 @@ public class MediaControllerContext : SysTrayApplicationContext
                     builder.AppendFormat("Loaded {0} LG IRCommands", lgCommands.Count);
                     builder.AppendLine();
                 }
+                if (PLEX_MEDIA_PLAYER_PROCESS_NAME != null)
+                {
+                    builder.AppendFormat("Media Play Process ({0}): {1}", PLEX_MEDIA_PLAYER_PROCESS_NAME, IsMediaPlayerRunning() ? "Running" : "Not Found");
+                    builder.AppendLine();
+                }
                 if (errors.Count > 0)
                 {
                     builder.AppendLine("ERRORS!");
@@ -153,6 +163,39 @@ public class MediaControllerContext : SysTrayApplicationContext
     protected override Form CreateMainForm()
     {
         mainForm = new MainForm();
+
+        mainForm.DeviceList.Add("LG Inside");
+        mainForm.DeviceList.Add("LG Outside");
+
+        if (lgCommands != null)
+        {
+            foreach (var kv in lgCommands)
+            {
+                var ird = kv.Value;
+                String s = String.Format("{0} ({1})", kv.Key, ird.Protocol + "," + ird.Address + "," + ird.Command);
+                mainForm.CommandList.Add(s);
+            }
+        }
+
+        mainForm.SendIRCommand += (sender, eargs) =>
+        {
+            Console.WriteLine("{0} sending {1}", eargs.Device, eargs.CommandString);
+            try
+            {
+                //SendIRCommand();
+            }
+            catch (Exception e)
+            {
+                //mainForm.ShowError(e);
+                if (Form.ActiveForm == mainForm && mainForm != null)
+                {
+                    mainForm.UpdateStatus(StatusReport);
+                    mainForm.ShowError(e);
+                }
+            }
+
+        };
+
         mainForm.Activated += (sender, eargs) =>
         {
             mainForm.UpdateStatus(StatusReport);
@@ -235,7 +278,7 @@ public class MediaControllerContext : SysTrayApplicationContext
 
                 String deviceName = "LG Home Theater";
                 uri = String.Format(uri, deviceName);
-                Console.WriteLine("Getting commands for device {0} using URI: {1}", deviceName, uri);
+                //Console.WriteLine("Getting commands for device {0} using URI: {1}", deviceName, uri);
                 lgCommands = await getIRCommands(deviceName, uri);
             }
             else
@@ -288,7 +331,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 try
                 {
                     //Add devices
-                    
+
                     //Connection
                     var path2device = cnnConfig["PathToDevice"];
                     if (path2device == null) throw new Exception("No path to device found");
@@ -347,10 +390,25 @@ public class MediaControllerContext : SysTrayApplicationContext
     }
     #endregion
 
-    #region Command handling
+    #region Message handling
     private void test()
     {
         //SendKeys.SendWait();
+    }
+    #endregion
+
+    #region Methods
+    void SendIRCommand()
+    {
+        if (board == null)
+        {
+            throw new Exception("No arduino board");
+        }
+        if (!board.IsConnected)
+        {
+            throw new Exception("Arduino board not connected");
+        }
+        
     }
     #endregion
 }
