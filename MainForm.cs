@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Chetch.Arduino.Devices.Infrared;
 
 namespace MediaController;
 
@@ -8,7 +9,7 @@ public partial class MainForm : Form
     public class IRSendArgs : EventArgs
     {
         public String? Device;
-        public String? CommandString;
+        public String? Command;
     }
 
     TextBox? statusBox;
@@ -21,7 +22,7 @@ public partial class MainForm : Form
     //event EventHandler<
     public BindingList<String> DeviceList { get; } = new BindingList<String>();
 
-    public BindingList<String> CommandList { get; } = new BindingList<String>();
+    public BindingList<IRData> CommandList { get; } = new BindingList<IRData>();
 
 
     public event EventHandler<IRSendArgs>? SendIRCommand;
@@ -42,6 +43,8 @@ public partial class MainForm : Form
             var source = new BindingSource();
             source.DataSource = CommandList;
             commands.DataSource = source;
+            commands.ValueMember = "CommandAlias";
+            commands.DisplayMember = "Description";
         }
 
         if (sendButton != null && devices != null && commands != null)
@@ -54,7 +57,7 @@ public partial class MainForm : Form
                 {
                     var sendArgs = new IRSendArgs();
                     sendArgs.Device = selectedDevice.ToString();
-                    sendArgs.CommandString = selectedCommandString.ToString();
+                    sendArgs.Command = selectedCommandString.ToString();
                     SendIRCommand?.Invoke(this, sendArgs);
                 }
             };
@@ -76,6 +79,6 @@ public partial class MainForm : Form
     
     public void ShowError(String errorMessage)
     {
-        MessageBox.Show("ERROR!", errorMessage, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        MessageBox.Show(errorMessage, "Error!", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }

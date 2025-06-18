@@ -11,6 +11,7 @@ using System.Text;
 using Chetch.Arduino.Devices;
 using System.Threading.Tasks;
 using Chetch.Arduino.Devices.Infrared;
+using Chetch.Arduino.Devices.Displays;
 
 namespace MediaController;
 
@@ -36,6 +37,10 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Constants and static methods and fields
     //const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "PlexMediaPlayer";
     const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "notepad";
+
+    const byte OLED_ID = 10;
+    const byte LG_INSIDE_ID = 11;
+    const byte LG_OUTSIDE_ID = 12;
 
     static String? PathToMediaPlayer = "C:/Program Files/Plex/Plex Media Player/PlexMediaPlayer.exe";
 
@@ -110,13 +115,13 @@ public class MediaControllerContext : SysTrayApplicationContext
                 {
                     if (board.IsReady)
                     {
-                        builder.AppendFormat("{0} is ready", board.SID);
+                        builder.AppendFormat("Arduino Board {0} is ready", board.SID);
                         builder.AppendLine();
                         builder.AppendFormat("Free memory: {0}", board.FreeMemory);
                     }
                     else
                     {
-                        builder.AppendFormat("{0} is not ready", board.SID);
+                        builder.AppendFormat("Arduino Board {0} is not ready", board.SID);
                     }
                     builder.AppendLine();
                 }
@@ -127,16 +132,17 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
                 if (PLEX_MEDIA_PLAYER_PROCESS_NAME != null)
                 {
-                    builder.AppendFormat("Media Play Process ({0}): {1}", PLEX_MEDIA_PLAYER_PROCESS_NAME, IsMediaPlayerRunning() ? "Running" : "Not Found");
+                    builder.AppendFormat("Media Player Process ({0}): {1}", PLEX_MEDIA_PLAYER_PROCESS_NAME, IsMediaPlayerRunning() ? "Running" : "Not Found");
                     builder.AppendLine();
                 }
                 if (errors.Count > 0)
                 {
-                    builder.AppendLine("ERRORS!");
+                    builder.Append("ERRORS: ");
                     foreach (var kv in errors)
                     {
-                        builder.AppendFormat("{0} : {1}", kv.Key, kv.Value);
+                        builder.AppendFormat("{0} : {1} ", kv.Key, kv.Value);
                     }
+                    builder.AppendLine();
                 }
                 else
                 {
@@ -163,6 +169,10 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     System.Timers.Timer timer = new System.Timers.Timer();
 
+    OLEDTextDisplay oled = new OLEDTextDisplay(OLED_ID, "oled");
+    IRTransmitter lgInside = new IRTransmitter(LG_INSIDE_ID, "lgin", "LG Inside");
+    IRTransmitter lgOutside = new IRTransmitter(LG_OUTSIDE_ID, "lgin", "LG Outside");
+
     ArduinoBoard board = new ArduinoBoard("mc");
     #endregion
 
@@ -170,25 +180,23 @@ public class MediaControllerContext : SysTrayApplicationContext
     {
         mainForm = new MainForm();
 
-        mainForm.DeviceList.Add("LG Inside");
-        mainForm.DeviceList.Add("LG Outside");
+        mainForm.DeviceList.Add(lgInside.Name);
+        mainForm.DeviceList.Add(lgOutside.Name);
 
         if (lgCommands != null)
         {
-            foreach (var kv in lgCommands)
+            foreach (var ird in lgCommands.Values)
             {
-                var ird = kv.Value;
-                String s = String.Format("{0} ({1})", kv.Key, ird.Protocol + "," + ird.Address + "," + ird.Command);
-                mainForm.CommandList.Add(s);
+                mainForm.CommandList.Add(ird);
             }
         }
 
         mainForm.SendIRCommand += (sender, eargs) =>
         {
-            Console.WriteLine("{0} sending {1}", eargs.Device, eargs.CommandString);
+            Console.WriteLine("{0} sending {1}", eargs.Device, eargs.Command);
             try
             {
-                //SendIRCommand();
+                SendIRCommand(eargs.Device, eargs.Command);
             }
             catch (Exception e)
             {
@@ -404,15 +412,35 @@ public class MediaControllerContext : SysTrayApplicationContext
     #endregion
 
     #region Methods
-    void SendIRCommand()
+    void SendIRCommand(String device, String command)
     {
         if (board == null)
         {
             throw new Exception("No arduino board");
         }
-        if (!board.IsConnected)
+        
+        IRTransmitter? transmitter = null;
+        if (device == lgInside.Name)
         {
-            throw new Exception("Arduino board not connected");
+            transmitter = lgInside;
+        }
+        else if (device == lgOutside.Name)
+        {
+            transmitter = lgOutside;
+        }
+
+        if (transmitter == null)
+        {
+            throw new Exception(String.Format("Cannot find device {0}", device));
+        }
+
+        if (lgCommands.ContainsKey(command))
+        {
+            transmitter.Transmit(lgCommands[command]);
+        }
+        else
+        {
+            //check if this is a sequence
         }
 
     }
