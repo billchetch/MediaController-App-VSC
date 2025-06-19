@@ -17,15 +17,23 @@ public partial class MainForm : Form
     TextBox? arduinoMessaging;
     ComboBox? devices;
     ComboBox? commands;
-    Button? sendButton;
+    Button? sendIRButton;
+
+
+    ComboBox? shortcuts;
+    Button? sendShortcutButton;
 
     //event EventHandler<
     public BindingList<String> DeviceList { get; } = new BindingList<String>();
 
     public BindingList<IRData> CommandList { get; } = new BindingList<IRData>();
 
+    public BindingList<KeyValuePair<String, String>> ShortcutsList { get; } = new BindingList<KeyValuePair<String, String>>();
+
 
     public event EventHandler<IRSendArgs>? SendIRCommand;
+
+    public event EventHandler<String> SendKeysCommand;
 
     public MainForm()
     {
@@ -47,9 +55,18 @@ public partial class MainForm : Form
             commands.DisplayMember = "Description";
         }
 
-        if (sendButton != null && devices != null && commands != null)
+        if (shortcuts != null)
         {
-            sendButton.Click += (sender, eargs) =>
+            var source = new BindingSource();
+            source.DataSource = ShortcutsList;
+            shortcuts.DataSource = source;
+            shortcuts.ValueMember = "Key";
+            shortcuts.DisplayMember = "Value";
+        }
+
+        if (sendIRButton != null && devices != null && commands != null)
+        {
+            sendIRButton.Click += (sender, eargs) =>
             {
                 var selectedDevice = devices.SelectedValue;
                 var selectedCommandString = commands.SelectedValue;
@@ -59,6 +76,18 @@ public partial class MainForm : Form
                     sendArgs.Device = selectedDevice.ToString();
                     sendArgs.Command = selectedCommandString.ToString();
                     SendIRCommand?.Invoke(this, sendArgs);
+                }
+            };
+        }
+
+        if (sendShortcutButton != null && shortcuts != null)
+        {
+            sendShortcutButton.Click += (sender, eargs) =>
+            {
+                var keys2send = shortcuts.SelectedValue;
+                if (keys2send != null)
+                {
+                    SendKeysCommand?.Invoke(this, keys2send.ToString());
                 }
             };
         }

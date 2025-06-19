@@ -32,7 +32,7 @@ partial class MainForm
     {
         this.components = new System.ComponentModel.Container();
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(650, 400);
+        this.ClientSize = new System.Drawing.Size(450, 500);
         this.Text = "Media Controller";
 
         int xPos = 35;
@@ -49,7 +49,7 @@ partial class MainForm
 
         statusBox = new TextBox();
         statusBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        statusBox.Width = 500;
+        statusBox.Width = this.ClientSize.Width - 2*xPos;
         statusBox.Height = 100;
         statusBox.Visible = true;
         statusBox.Text = "--";
@@ -69,7 +69,7 @@ partial class MainForm
 
         xmppMessaging = new TextBox();
         xmppMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        xmppMessaging.Width = 500;
+        xmppMessaging.Width = statusBox.Width;
         xmppMessaging.Height = 40;
         xmppMessaging.Multiline = true;
         xmppMessaging.Visible = true;
@@ -87,7 +87,7 @@ partial class MainForm
 
         arduinoMessaging = new TextBox();
         arduinoMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        arduinoMessaging.Width = 500;
+        arduinoMessaging.Width = xmppMessaging.Width;
         arduinoMessaging.Height = 40;
         arduinoMessaging.Multiline = true;
         arduinoMessaging.Visible = true;
@@ -118,11 +118,31 @@ partial class MainForm
         commands.DropDownStyle = ComboBoxStyle.DropDownList;
         Controls.Add(commands);
 
-        sendButton = new Button();
-        sendButton.Location = new Point(commands.Location.X + commands.Width + 8, commands.Location.Y);
-        sendButton.Text = "Send";
-        sendButton.Enabled = true;
-        Controls.Add(sendButton);
+        sendIRButton = new Button();
+        sendIRButton.Location = new Point(commands.Location.X + commands.Width + 8, commands.Location.Y);
+        sendIRButton.Text = "Send";
+        sendIRButton.Enabled = true;
+        Controls.Add(sendIRButton);
+
+        lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.AutoSize = true;
+        lbl.Text = "Media Player Shortcuts";
+        lbl.Location = new Point(xPos, devices.Location.Y + devices.Height + yPad2);
+        Controls.Add(lbl);
+
+        shortcuts = new ComboBox();
+        shortcuts.Location = new Point(xPos, lbl.Location.Y + lbl.Height + 4);
+        shortcuts.Width = 200;
+        shortcuts.Enabled = true;
+        shortcuts.DropDownStyle = ComboBoxStyle.DropDownList;
+        Controls.Add(shortcuts);
+        
+        sendShortcutButton = new Button();
+        sendShortcutButton.Location = new Point(shortcuts.Location.X + shortcuts.Width + 8, shortcuts.Location.Y);
+        sendShortcutButton.Text = "Send";
+        sendShortcutButton.Enabled = true;
+        Controls.Add(sendShortcutButton);
     }
 
     #endregion

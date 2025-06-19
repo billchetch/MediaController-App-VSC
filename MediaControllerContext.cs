@@ -12,6 +12,7 @@ using Chetch.Arduino.Devices;
 using System.Threading.Tasks;
 using Chetch.Arduino.Devices.Infrared;
 using Chetch.Arduino.Devices.Displays;
+using XmppDotNet.Xmpp.Jingle;
 
 namespace MediaController;
 
@@ -29,24 +30,28 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     [DllImport("user32.dll")]
     static extern IntPtr GetForegroundWindow();
-    
+
     [DllImport("user32.dll")]
     static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
     #endregion
 
-    #region Constants and static methods and fields
-    //const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "PlexMediaPlayer";
-    const String PLEX_MEDIA_PLAYER_PROCESS_NAME = "notepad";
-
+    #region Constants, static methods and fields
+    
     const byte OLED_ID = 10;
     const byte LG_INSIDE_ID = 11;
     const byte LG_OUTSIDE_ID = 12;
 
     static String? PathToMediaPlayer = "C:/Program Files/Plex/Plex Media Player/PlexMediaPlayer.exe";
+    static String? MediaPlayerProcessName = "PlexMediaPlayer";
+
+    static Process? MediaPlayerProcess;
+    static Object lockMediaPlayerProcess = new object();
+
+    static Dictionary<String, String>? MediaPlayerShortcuts;
 
     static Process? GetMediaPlayerProcess()
     {
-        var processes = Process.GetProcessesByName(PLEX_MEDIA_PLAYER_PROCESS_NAME);
+        var processes = Process.GetProcessesByName(MediaPlayerProcessName);
         if (processes.Length >= 1)
         {
             return processes[0];
@@ -59,44 +64,56 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     static bool IsMediaPlayerRunning()
     {
-        return GetMediaPlayerProcess() != null;
+        if (MediaPlayerProcess != null && !MediaPlayerProcess.HasExited)
+        {
+            return true;
+        }
+        else
+        {
+            lock (lockMediaPlayerProcess)
+            {
+                MediaPlayerProcess = GetMediaPlayerProcess();
+            }
+            return MediaPlayerProcess != null && !MediaPlayerProcess.HasExited;
+        }
     }
 
-    static bool ActivateMediaPlayer()
+    static void StartMediaPlayerProcess()
     {
-        bool newProcess = false;
-        var process = GetMediaPlayerProcess();
-
-        if (process == null && PathToMediaPlayer != null)
+        if (IsMediaPlayerRunning())
         {
-            String cmd = PathToMediaPlayer;
-            process = Process.Start(cmd);
-            newProcess = true;
-            while (process.MainWindowHandle == IntPtr.Zero)
+            throw new Exception("Media player already running");
+        }
+        else
+        {
+            lock (lockMediaPlayerProcess)
             {
-                System.Threading.Thread.Sleep(1000);
+                MediaPlayerProcess = Process.Start(PathToMediaPlayer);
+                Thread.Sleep(1000);
+            }
+            if (MediaPlayerProcess != null)
+            {
+                SetMediaPlayerAsForeground();
             }
         }
-
-        if (process == null)
-        {
-            throw new Exception("Media Player process failed to start");
-        }
-        if (process.MainWindowHandle == IntPtr.Zero)
-        {
-            throw new Exception("Media Player main window handle is zero");
-        }
-
-        SwitchToThisWindow(process.MainWindowHandle, true);
-        SetForegroundWindow(process.MainWindowHandle);
-
-        MediaPlayerActive = true;
-
-        return !newProcess;
     }
 
-    static bool MediaPlayerActive = false;
-    #endregion
+    static void SetMediaPlayerAsForeground()
+    {
+        if (IsMediaPlayerRunning())
+        {
+            if (GetForegroundWindow() != MediaPlayerProcess.MainWindowHandle)
+            {
+                SwitchToThisWindow(MediaPlayerProcess.MainWindowHandle, true);
+                SetForegroundWindow(MediaPlayerProcess.MainWindowHandle);
+            }
+        }
+        else
+        {
+            throw new Exception("Meida Player is not running");
+        }
+    }
+#endregion
 
     #region Properties
     public String StatusReport
@@ -130,9 +147,9 @@ public class MediaControllerContext : SysTrayApplicationContext
                     builder.AppendFormat("Loaded {0} LG IRCommands", lgCommands.Count);
                     builder.AppendLine();
                 }
-                if (PLEX_MEDIA_PLAYER_PROCESS_NAME != null)
+                if (MediaPlayerProcessName != null)
                 {
-                    builder.AppendFormat("Media Player Process ({0}): {1}", PLEX_MEDIA_PLAYER_PROCESS_NAME, IsMediaPlayerRunning() ? "Running" : "Not Found");
+                    builder.AppendFormat("Media Player Process ({0}): {1}", MediaPlayerProcessName, IsMediaPlayerRunning() ? "Running" : "Not Found");
                     builder.AppendLine();
                 }
                 if (errors.Count > 0)
@@ -164,6 +181,7 @@ public class MediaControllerContext : SysTrayApplicationContext
     ChetchXMPPConnection? cnn = null;
 
     Dictionary<String, IRData>? lgCommands;
+    Dictionary<String, String>? lgCommandSequences;
 
     MainForm? mainForm;
 
@@ -190,6 +208,18 @@ public class MediaControllerContext : SysTrayApplicationContext
                 mainForm.CommandList.Add(ird);
             }
         }
+        if (lgCommandSequences != null)
+        {
+            foreach (var kv in lgCommandSequences)
+            {
+                var ird = new IRData(0, 0, 0);
+                ird.CommandAlias = kv.Key;
+                mainForm.CommandList.Add(ird);
+            }
+        }
+
+        foreach (var kv in MediaPlayerShortcuts)
+            mainForm.ShortcutsList.Add(kv);
 
         mainForm.SendIRCommand += (sender, eargs) =>
         {
@@ -208,6 +238,24 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
             }
 
+        };
+
+        mainForm.SendKeysCommand += (Senders, keys2send) =>
+        {
+            Console.WriteLine("Sending {0} media player", keys2send);
+            try
+            {
+                SendKeysToMediaPlayer(keys2send);
+            }
+            catch (Exception e)
+            {
+                //mainForm.ShowError(e);
+                if (Form.ActiveForm == mainForm && mainForm != null)
+                {
+                    mainForm.UpdateStatus(StatusReport);
+                    mainForm.ShowError(e);
+                }
+            }
         };
 
         mainForm.Activated += (sender, eargs) =>
@@ -257,10 +305,6 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Init and End
     override protected async void InitializeContext(bool asSysTray)
     {
-        if (Config != null && Config.GetSection("PathToMediaPlayer") != null)
-        {
-            PathToMediaPlayer = Config.GetSection("PathToMediaPlayer").ToString();
-        }
         NotifyIconPath = "icon-white.ico";
         NotifyIconText = "Media Controller";
 
@@ -278,6 +322,30 @@ public class MediaControllerContext : SysTrayApplicationContext
         };
         timer.Start();
 
+        //Media Player settings
+        try
+        {
+            if (Config != null && Config.GetSection("MediaPlayer").Exists())
+            {
+                var mps = Config.GetSection("MediaPlayer");
+                PathToMediaPlayer = mps["PathToMediaPlayer"];
+                MediaPlayerProcessName = mps["MediaPlayerProcessName"];
+
+                MediaPlayerShortcuts = mps.GetSection("Shortcuts").Get<Dictionary<String, String>>();
+            }
+            else
+            {
+                //use default values
+            }
+
+            //In case it's already running when this fires up
+            MediaPlayerProcess = GetMediaPlayerProcess();
+        }
+        catch (Exception e)
+        {
+            errors["Media Player"] = e.Message;
+        }
+        
         //Load IR Commands
         try
         {
@@ -294,6 +362,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 uri = String.Format(uri, deviceName);
                 //Console.WriteLine("Getting commands for device {0} using URI: {1}", deviceName, uri);
                 lgCommands = await getIRCommands(deviceName, uri);
+                lgCommandSequences = irc.GetSection("Sequences").Get<Dictionary<String, String>>();
             }
             else
             {
@@ -418,7 +487,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         {
             throw new Exception("No arduino board");
         }
-        
+
         IRTransmitter? transmitter = null;
         if (device == lgInside.Name)
         {
@@ -438,11 +507,45 @@ public class MediaControllerContext : SysTrayApplicationContext
         {
             transmitter.Transmit(lgCommands[command]);
         }
+        else if (lgCommandSequences.ContainsKey(command))
+        {
+            var sequenceOfCommands = lgCommandSequences[command].Split(",");
+            List<IRData> sequence = new List<IRData>();
+            foreach (var cmd in sequenceOfCommands)
+            {
+                if (lgCommands.ContainsKey(cmd))
+                {
+                    sequence.Add(lgCommands[cmd]);
+                }
+            }
+            if (sequence.Count > 0)
+            {
+                transmitter.TransmitAsync(sequence, 1000);
+            }
+            else
+            {
+                throw new Exception(String.Format("{0} is not a valid sequence", lgCommandSequences[command]));
+            }
+        }
         else
         {
-            //check if this is a sequence
+            throw new Exception(String.Format("Cannot find command {0} for device {1}", command, device));
         }
 
+    }
+
+    void SendKeysToMediaPlayer(String keys)
+    {
+        if (IsMediaPlayerRunning())
+        {
+            SetMediaPlayerAsForeground(); //ensure in foreground
+        }
+        else
+        {
+            StartMediaPlayerProcess();
+        }
+
+        SendKeys.Send(keys);
     }
     #endregion
 }
