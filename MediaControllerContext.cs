@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Chetch.Windows;
 using Chetch.ChetchXMPP;
+using Chetch.Utilities;
 using Microsoft.Extensions.Configuration;
 using Chetch.Arduino;
 using System.Reflection.Metadata.Ecma335;
@@ -128,6 +129,11 @@ public class MediaControllerContext : SysTrayApplicationContext
                     builder.AppendFormat("{0}: {1}", cnn.Username, cnn.CurrentState.ToString());
                     builder.AppendLine();
                 }
+                if (btsc != null)
+                {
+                    builder.AppendFormat("Bluetooth on {0} connected: {1}", btsc.PortName, btsc.IsConnected);
+                    builder.AppendLine();
+                }
                 if (board != null)
                 {
                     if (board.IsReady)
@@ -152,19 +158,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                     builder.AppendFormat("Media Player Process ({0}): {1}", MediaPlayerProcessName, IsMediaPlayerRunning() ? "Running" : "Not Found");
                     builder.AppendLine();
                 }
-                if (errors.Count > 0)
-                {
-                    builder.Append("ERRORS: ");
-                    foreach (var kv in errors)
-                    {
-                        builder.AppendFormat("{0} : {1} ", kv.Key, kv.Value);
-                    }
-                    builder.AppendLine();
-                }
-                else
-                {
-                    builder.AppendLine("No errors");
-                }
+                
                 return builder.ToString();
             }
             catch (Exception e)
@@ -173,12 +167,35 @@ public class MediaControllerContext : SysTrayApplicationContext
             }
         }
     }
+
+    public String ErrorReport
+    {
+        get
+        {
+            StringBuilder builder = new StringBuilder();
+            if (errors.Count > 0)
+            {
+                foreach (var kv in errors)
+                {
+                    builder.AppendFormat("{0} : {1} ", kv.Key, kv.Value);
+                    builder.AppendLine();
+                }
+            }
+            else
+            {
+                builder.AppendLine("No errors");
+            }
+            return builder.ToString();
+        }
+    }
     #endregion
 
     #region Fields
     Dictionary<String, String> errors = new Dictionary<String, String>();
 
     ChetchXMPPConnection? cnn = null;
+
+    BluetoothSerialConnection? btsc = null;
 
     Dictionary<String, IRData>? lgCommands;
     Dictionary<String, String>? lgCommandSequences;
@@ -233,11 +250,10 @@ public class MediaControllerContext : SysTrayApplicationContext
                 //mainForm.ShowError(e);
                 if (Form.ActiveForm == mainForm && mainForm != null)
                 {
-                    mainForm.UpdateStatus(StatusReport);
+                    mainForm.UpdateErrors(ErrorReport);
                     mainForm.ShowError(e);
                 }
             }
-
         };
 
         mainForm.SendKeysCommand += (Senders, keys2send) =>
@@ -252,7 +268,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 //mainForm.ShowError(e);
                 if (Form.ActiveForm == mainForm && mainForm != null)
                 {
-                    mainForm.UpdateStatus(StatusReport);
+                    mainForm.UpdateErrors(ErrorReport);
                     mainForm.ShowError(e);
                 }
             }
@@ -318,6 +334,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             if (Form.ActiveForm == mainForm && mainForm != null)
             {
                 mainForm.UpdateStatus(StatusReport);
+                mainForm.UpdateErrors(ErrorReport);
             }
         };
         timer.Start();
@@ -378,9 +395,9 @@ public class MediaControllerContext : SysTrayApplicationContext
         //Connect XMPP client
         try
         {
-            if (Config != null && Config.GetSection("Credentials").Exists())
+            if (Config != null && Config.GetSection("XMPP").Exists())
             {
-                var creds = Config.GetSection("Credentials");
+                var creds = Config.GetSection("XMPP");
                 var un = creds["Username"];
                 var pw = creds["Password"];
                 if (un == null || pw == null) throw new Exception("Username and/or password cannot be null");
@@ -398,6 +415,38 @@ public class MediaControllerContext : SysTrayApplicationContext
             else
             {
                 throw new Exception("Cannot find XMPP credentials etry in app config");
+            }
+        }
+        catch (Exception e)
+        {
+            errors["XMPP"] = e.Message;
+        }
+
+        //Connect Bluetooth
+        try
+        {
+            if (Config != null && Config.GetSection("Bluetooth").Exists())
+            {
+                var bconfig = Config.GetSection("Bluetooth");
+                var devicePath = bconfig["PathToDevice"];
+                if (String.IsNullOrEmpty(devicePath))
+                {
+                    throw new Exception("No path to device supplied");
+                }
+
+                btsc = new BluetoothSerialConnection(devicePath);
+                try
+                {
+                    btsc.Connect();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+            else
+            {
+                throw new Exception("Cannot find Bluetooth entry in app config");
             }
         }
         catch (Exception e)

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Security.Cryptography.X509Certificates;
 using Chetch.Arduino.Devices.Infrared;
 
 namespace MediaController;
@@ -13,6 +14,9 @@ public partial class MainForm : Form
     }
 
     TextBox? statusBox;
+
+    TextBox? errorsBox;
+
     TextBox? xmppMessaging;
     TextBox? arduinoMessaging;
     ComboBox? devices;
@@ -93,11 +97,19 @@ public partial class MainForm : Form
         }
     }
 
-    public void UpdateStatus(String text)
+    public void UpdateStatus(String status)
     {
         if (statusBox != null)
         {
-            statusBox.Text = text;
+            statusBox.Text = status;
+        }
+    }
+
+    public void UpdateErrors(String errors)
+    {
+        if (errorsBox != null)
+        {
+            errorsBox.Text = errors;
         }
     }
 

@@ -40,6 +40,7 @@ partial class MainForm
         int yPad1 = 0;
         int yPad2 = 12;
 
+        #region Status Box
         var lbl = new Label();
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
         lbl.Text = "Status";
@@ -58,18 +59,40 @@ partial class MainForm
         statusBox.Multiline = true;
         statusBox.Enabled = false;
         Controls.Add(statusBox);
+        #endregion
 
-
+        #region Errors Box
         lbl = new Label();
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
-        lbl.Text = "XMPP Messaging";
+        lbl.Text = "Status";
         lbl.AutoSize = true;
         lbl.Location = new Point(xPos, statusBox.Location.Y + statusBox.Height + yPad2);
         Controls.Add(lbl);
 
+        errorsBox = new TextBox();
+        errorsBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
+        errorsBox.Width = statusBox.Width;
+        errorsBox.Height = 30;
+        errorsBox.Visible = true;
+        errorsBox.Text = "--";
+        //statusBox.BorderStyle = BorderStyle.FixedSingle;
+        errorsBox.ReadOnly = true;
+        errorsBox.Multiline = true;
+        errorsBox.Enabled = false;
+        Controls.Add(errorsBox);
+        #endregion
+
+        #region Client Messaging
+        lbl = new Label();
+        lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
+        lbl.Text = "Client Messaging";
+        lbl.AutoSize = true;
+        lbl.Location = new Point(xPos, errorsBox.Location.Y + errorsBox.Height + yPad2);
+        Controls.Add(lbl);
+
         xmppMessaging = new TextBox();
         xmppMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        xmppMessaging.Width = statusBox.Width;
+        xmppMessaging.Width = errorsBox.Width;
         xmppMessaging.Height = 40;
         xmppMessaging.Multiline = true;
         xmppMessaging.Visible = true;
@@ -77,7 +100,9 @@ partial class MainForm
         xmppMessaging.ReadOnly = true;
         xmppMessaging.Enabled = false;
         Controls.Add(xmppMessaging);
+        #endregion
 
+        #region Arduino Messaging
         lbl = new Label();
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
         lbl.AutoSize = true;
@@ -95,7 +120,7 @@ partial class MainForm
         arduinoMessaging.ReadOnly = true;
         arduinoMessaging.Enabled = false;
         Controls.Add(arduinoMessaging);
-
+        #endregion
 
         lbl = new Label();
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
