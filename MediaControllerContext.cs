@@ -232,6 +232,11 @@ public class MediaControllerContext : SysTrayApplicationContext
             return builder.ToString();
         }
     }
+
+    public ArduinoMessage? LastArduinoMessageSent;
+
+    public ArduinoMessage? LastArduinoMessageReceived;
+
     public String ArduinoMessagingReport
     {
         get
@@ -380,20 +385,22 @@ public class MediaControllerContext : SysTrayApplicationContext
 
         base.InitializeContext(asSysTray);
 
-        //set up timer
+        //Set up timer
         timer.AutoReset = true;
         timer.Interval = 5000;
         timer.Elapsed += (sender, eargs) =>
         {
-            if (IsMainFormActive)
+            if (IsMainFormActive && mainForm != null)
             {
                 mainForm.UpdateStatus(StatusReport);
                 mainForm.UpdateErrors(ErrorReport);
+                mainForm.UpdateClientMessaging(ClientMessagingReport);
+                mainForm.UpdateArduinoMessaging(ArduinoMessagingReport);
             }
         };
         timer.Start();
 
-        //Media Player settings
+        //Configure Media Player settings
         try
         {
             if (Config != null && Config.GetSection("MediaPlayer").Exists())
@@ -467,10 +474,12 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
                 cnn.MessageReceived += (sender, eargs) =>
                 {
+                    LastClientMessageReceived = eargs.Message;
                     var response = new Chetch.Messaging.Message();
                     if (handleClientMessage(eargs.Message, response))
                     {
-
+                        cnn.SendMessageAsync(response);
+                        LastClientMessageSent = response;
                     }
 
                     if (IsMainFormActive)
@@ -510,12 +519,14 @@ public class MediaControllerContext : SysTrayApplicationContext
                     {
                         var json = Chetch.Utilities.Convert.ToString(payload);
                         var message = Chetch.Messaging.Message.Deserialize(json);
+                        LastClientMessageReceived = message;
                         var response = new Chetch.Messaging.Message();
                         if (handleClientMessage(message, response))
                         {
                             json = response.Serialize();
                             btOutFrame.Payload = Chetch.Utilities.Convert.ToBytes(json);
                             btsc.SendData(btOutFrame.GetBytes().ToArray());
+                            LastClientMessageSent = response;
                         }
 
                         if (IsMainFormActive)
