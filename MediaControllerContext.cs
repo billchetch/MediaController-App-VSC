@@ -5,6 +5,7 @@ using System.Text.Json;
 using Chetch.Windows;
 using Chetch.ChetchXMPP;
 using Chetch.Utilities;
+using Chetch.Messaging;
 using Microsoft.Extensions.Configuration;
 using Chetch.Arduino;
 using System.Reflection.Metadata.Ecma335;
@@ -14,6 +15,7 @@ using System.Threading.Tasks;
 using Chetch.Arduino.Devices.Infrared;
 using Chetch.Arduino.Devices.Displays;
 using XmppDotNet.Xmpp.Jingle;
+using Chetch.Messaging;
 
 namespace MediaController;
 
@@ -129,10 +131,19 @@ public class MediaControllerContext : SysTrayApplicationContext
                     builder.AppendFormat("{0}: {1}", cnn.Username, cnn.CurrentState.ToString());
                     builder.AppendLine();
                 }
+                else
+                {
+                    builder.AppendLine("XMPP not configured");
+                }
+
                 if (btsc != null)
                 {
                     builder.AppendFormat("Bluetooth on {0} connected: {1}", btsc.PortName, btsc.IsConnected);
                     builder.AppendLine();
+                }
+                else
+                {
+                    builder.AppendLine("Bluetooth not configured");
                 }
                 if (board != null)
                 {
@@ -188,6 +199,48 @@ public class MediaControllerContext : SysTrayApplicationContext
             return builder.ToString();
         }
     }
+
+
+    public Chetch.Messaging.Message? LastClientMessageSent;
+
+    public Chetch.Messaging.Message? LastClientMessageReceived;
+
+    public String ClientMessagingReport
+    {
+        get
+        {
+            StringBuilder builder = new StringBuilder();
+            String dstr;
+            String desc;
+            if (LastClientMessageSent != null)
+            {
+                dstr = LastClientMessageSent.Created.ToString("yyyyMMddHHmmss");
+                desc = LastClientMessageSent.Type + " to " + LastClientMessageSent.Target;
+                builder.AppendFormat("Last sent on {0}: {1}", dstr, desc);
+            } else {
+                builder.Append("No client messages sent");
+            }
+            builder.AppendLine();
+            if (LastClientMessageReceived != null)
+            {
+                dstr = LastClientMessageReceived.Created.ToString("yyyyMMddHHmmss");
+                desc = LastClientMessageReceived.Type + " from " + LastClientMessageReceived.Sender;
+                builder.AppendFormat("Last received on {0}: {1}", dstr, desc);
+            } else {
+                builder.Append("No client messages received");
+            }
+            return builder.ToString();
+        }
+    }
+    public String ArduinoMessagingReport
+    {
+        get
+        {
+            return "";
+        }
+    }
+
+    protected bool IsMainFormActive => Form.ActiveForm == mainForm && mainForm != null;
     #endregion
 
     #region Fields
@@ -248,7 +301,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             catch (Exception e)
             {
                 //mainForm.ShowError(e);
-                if (Form.ActiveForm == mainForm && mainForm != null)
+                if (IsMainFormActive)
                 {
                     mainForm.UpdateErrors(ErrorReport);
                     mainForm.ShowError(e);
@@ -266,7 +319,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             catch (Exception e)
             {
                 //mainForm.ShowError(e);
-                if (Form.ActiveForm == mainForm && mainForm != null)
+                if (IsMainFormActive)
                 {
                     mainForm.UpdateErrors(ErrorReport);
                     mainForm.ShowError(e);
@@ -277,6 +330,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         mainForm.Activated += (sender, eargs) =>
         {
             mainForm.UpdateStatus(StatusReport);
+            mainForm.UpdateErrors(ErrorReport);
         };
 
         return mainForm;
@@ -331,7 +385,7 @@ public class MediaControllerContext : SysTrayApplicationContext
         timer.Interval = 5000;
         timer.Elapsed += (sender, eargs) =>
         {
-            if (Form.ActiveForm == mainForm && mainForm != null)
+            if (IsMainFormActive)
             {
                 mainForm.UpdateStatus(StatusReport);
                 mainForm.UpdateErrors(ErrorReport);
@@ -411,10 +465,23 @@ public class MediaControllerContext : SysTrayApplicationContext
                 {
                     Console.WriteLine(e.Message);
                 }
+                cnn.MessageReceived += (sender, eargs) =>
+                {
+                    var response = new Chetch.Messaging.Message();
+                    if (handleClientMessage(eargs.Message, response))
+                    {
+
+                    }
+
+                    if (IsMainFormActive)
+                    {
+                        mainForm.UpdateClientMessaging(ClientMessagingReport);
+                    }
+                };
             }
             else
             {
-                throw new Exception("Cannot find XMPP credentials etry in app config");
+                //Config does not contain xmpp
             }
         }
         catch (Exception e)
@@ -435,6 +502,46 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
 
                 btsc = new BluetoothSerialConnection(devicePath);
+                Frame btInFrame = new Frame(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM, MessageEncoding.JSON);
+                Frame btOutFrame = new Frame(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM, MessageEncoding.JSON);
+                btInFrame.FrameComplete += (sender, payload) =>
+                {
+                    try
+                    {
+                        var json = Chetch.Utilities.Convert.ToString(payload);
+                        var message = Chetch.Messaging.Message.Deserialize(json);
+                        var response = new Chetch.Messaging.Message();
+                        if (handleClientMessage(message, response))
+                        {
+                            json = response.Serialize();
+                            btOutFrame.Payload = Chetch.Utilities.Convert.ToBytes(json);
+                            btsc.SendData(btOutFrame.GetBytes().ToArray());
+                        }
+
+                        if (IsMainFormActive)
+                        {
+                            mainForm.UpdateClientMessaging(ClientMessagingReport);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        errors["Bluetooth Comms"] = e.Message;
+                    }
+                };
+
+                btsc.DataReceived += (sender, data) =>
+                {
+                    try
+                    {
+                        btInFrame.Add(data);
+                    }
+                    catch (Exception e)
+                    {
+                        errors["Bluetooth Comms"] = e.Message;
+                    }
+                };
+
+
                 try
                 {
                     btsc.Connect();
@@ -446,12 +553,12 @@ public class MediaControllerContext : SysTrayApplicationContext
             }
             else
             {
-                throw new Exception("Cannot find Bluetooth entry in app config");
+                //Config does not contain bluetooth
             }
         }
         catch (Exception e)
         {
-            errors["XMPP"] = e.Message;
+            errors["Bluetooth"] = e.Message;
         }
 
         //Connect arduino board
@@ -473,7 +580,10 @@ public class MediaControllerContext : SysTrayApplicationContext
                     //Event handlers
                     board.Ready += (sender, ready) =>
                     {
-                        Console.WriteLine("Board is ready");
+                        if (IsMainFormActive)
+                        {
+                            mainForm.UpdateStatus(StatusReport);
+                        }
                     };
 
                     //Handle errors either thrown or generated from the board by just logging them
@@ -484,6 +594,14 @@ public class MediaControllerContext : SysTrayApplicationContext
                     board.ExceptionThrown += (sender, errorArgs) =>
                     {
                         errors["Arduino"] = errorArgs.GetException().Message;
+                    };
+
+                    board.MessageReceived += (sender, updatedProperties) =>
+                    {
+                        if (IsMainFormActive)
+                        {
+                            mainForm.UpdateArduinoMessaging(ArduinoMessagingReport);
+                        }
                     };
 
                     //Now begin
@@ -523,10 +641,12 @@ public class MediaControllerContext : SysTrayApplicationContext
     #endregion
 
     #region Message handling
-    private void test()
+    private bool handleClientMessage(Chetch.Messaging.Message message, Chetch.Messaging.Message response)
     {
-        //SendKeys.SendWait();
+        return false;
     }
+
+
     #endregion
 
     #region Methods

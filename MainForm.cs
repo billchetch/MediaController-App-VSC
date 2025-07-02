@@ -17,7 +17,7 @@ public partial class MainForm : Form
 
     TextBox? errorsBox;
 
-    TextBox? xmppMessaging;
+    TextBox? clientMessaging;
     TextBox? arduinoMessaging;
     ComboBox? devices;
     ComboBox? commands;
@@ -110,6 +110,22 @@ public partial class MainForm : Form
         if (errorsBox != null)
         {
             errorsBox.Text = errors;
+        }
+    }
+
+     public void UpdateClientMessaging(string report)
+    {
+        if (clientMessaging != null)
+        {
+            clientMessaging.Text = report;
+        }
+    }
+
+    public void UpdateArduinoMessaging(string report)
+    {
+        if (arduinoMessaging != null)
+        {
+            arduinoMessaging.Text = report;
         }
     }
 

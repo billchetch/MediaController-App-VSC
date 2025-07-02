@@ -51,20 +51,21 @@ partial class MainForm
         statusBox = new TextBox();
         statusBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
         statusBox.Width = this.ClientSize.Width - 2*xPos;
-        statusBox.Height = 100;
+        statusBox.Height = 80;
         statusBox.Visible = true;
         statusBox.Text = "--";
         //statusBox.BorderStyle = BorderStyle.FixedSingle;
         statusBox.ReadOnly = true;
         statusBox.Multiline = true;
         statusBox.Enabled = false;
+        statusBox.ScrollBars = ScrollBars.Vertical;
         Controls.Add(statusBox);
         #endregion
 
         #region Errors Box
         lbl = new Label();
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
-        lbl.Text = "Status";
+        lbl.Text = "Errors";
         lbl.AutoSize = true;
         lbl.Location = new Point(xPos, statusBox.Location.Y + statusBox.Height + yPad2);
         Controls.Add(lbl);
@@ -72,13 +73,14 @@ partial class MainForm
         errorsBox = new TextBox();
         errorsBox.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
         errorsBox.Width = statusBox.Width;
-        errorsBox.Height = 30;
+        errorsBox.Height = 40;
         errorsBox.Visible = true;
         errorsBox.Text = "--";
         //statusBox.BorderStyle = BorderStyle.FixedSingle;
         errorsBox.ReadOnly = true;
         errorsBox.Multiline = true;
         errorsBox.Enabled = false;
+        errorsBox.ScrollBars = ScrollBars.Vertical;
         Controls.Add(errorsBox);
         #endregion
 
@@ -90,16 +92,16 @@ partial class MainForm
         lbl.Location = new Point(xPos, errorsBox.Location.Y + errorsBox.Height + yPad2);
         Controls.Add(lbl);
 
-        xmppMessaging = new TextBox();
-        xmppMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        xmppMessaging.Width = errorsBox.Width;
-        xmppMessaging.Height = 40;
-        xmppMessaging.Multiline = true;
-        xmppMessaging.Visible = true;
-        xmppMessaging.Text = "No commands received or sent";
-        xmppMessaging.ReadOnly = true;
-        xmppMessaging.Enabled = false;
-        Controls.Add(xmppMessaging);
+        clientMessaging = new TextBox();
+        clientMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
+        clientMessaging.Width = errorsBox.Width;
+        clientMessaging.Height = 40;
+        clientMessaging.Multiline = true;
+        clientMessaging.Visible = true;
+        clientMessaging.Text = "No commands received or sent";
+        clientMessaging.ReadOnly = true;
+        clientMessaging.Enabled = false;
+        Controls.Add(clientMessaging);
         #endregion
 
         #region Arduino Messaging
@@ -107,12 +109,12 @@ partial class MainForm
         lbl.Font = new Font(Label.DefaultFont, FontStyle.Bold);
         lbl.AutoSize = true;
         lbl.Text = "Arduino Messaging";
-        lbl.Location = new Point(xPos, xmppMessaging.Location.Y + xmppMessaging.Height + yPad2);
+        lbl.Location = new Point(xPos, clientMessaging.Location.Y + clientMessaging.Height + yPad2);
         Controls.Add(lbl);
 
         arduinoMessaging = new TextBox();
         arduinoMessaging.Location = new Point(xPos, lbl.Location.Y + lbl.Height + yPad1);
-        arduinoMessaging.Width = xmppMessaging.Width;
+        arduinoMessaging.Width = clientMessaging.Width;
         arduinoMessaging.Height = 40;
         arduinoMessaging.Multiline = true;
         arduinoMessaging.Visible = true;
