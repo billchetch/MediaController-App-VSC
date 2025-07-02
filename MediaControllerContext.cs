@@ -241,7 +241,27 @@ public class MediaControllerContext : SysTrayApplicationContext
     {
         get
         {
-            return "";
+            StringBuilder builder = new StringBuilder();
+            String dstr;
+            String desc;
+            if (LastArduinoMessageSent != null)
+            {
+                dstr = LastArduinoMessageSent.Created.ToString("yyyyMMddHHmmss");
+                desc = LastArduinoMessageSent.Type + " to " + LastArduinoMessageSent.Target;
+                builder.AppendFormat("Last sent on {0}: {1}", dstr, desc);
+            } else {
+                builder.Append("No arduino messages sent");
+            }
+            builder.AppendLine();
+            if (LastArduinoMessageReceived != null)
+            {
+                dstr = LastArduinoMessageReceived.Created.ToString("yyyyMMddHHmmss");
+                desc = LastArduinoMessageReceived.Type + " from " + LastArduinoMessageReceived.Sender;
+                builder.AppendFormat("Last received on {0}: {1}", dstr, desc);
+            } else {
+                builder.Append("No arduino messages received");
+            }
+            return builder.ToString();
         }
     }
 
@@ -390,7 +410,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             errors["XMPP"] = e.Message;
         }
 
-        //Connect Bluetooth
+        //Connect Bluetooth client
         try
         {
             if (Config != null && Config.GetSection("Bluetooth").Exists())
@@ -464,7 +484,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             errors["Bluetooth"] = e.Message;
         }
 
-        //Connect arduino board
+        //Connect Arduino board
         try
         {
             if (Config != null && Config.GetSection("Arduino").Exists())
@@ -499,8 +519,18 @@ public class MediaControllerContext : SysTrayApplicationContext
                         errors["Arduino"] = errorArgs.GetException().Message;
                     };
 
-                    board.MessageReceived += (sender, updatedProperties) =>
+                    board.MessageReceived += (sender, message) =>
                     {
+                        LastArduinoMessageReceived = message;
+                        if (IsMainFormActive)
+                        {
+                            mainForm.UpdateArduinoMessaging(ArduinoMessagingReport);
+                        }
+                    };
+
+                    board.MessageSent += (sender, message) =>
+                    {
+                        LastArduinoMessageSent = message;
                         if (IsMainFormActive)
                         {
                             mainForm.UpdateArduinoMessaging(ArduinoMessagingReport);
