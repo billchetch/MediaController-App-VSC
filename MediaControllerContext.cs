@@ -269,114 +269,6 @@ public class MediaControllerContext : SysTrayApplicationContext
     ArduinoBoard board = new ArduinoBoard("mc");
     #endregion
 
-    protected override Form CreateMainForm()
-    {
-        mainForm = new MainForm();
-
-        mainForm.DeviceList.Add(lgInside.Name);
-        mainForm.DeviceList.Add(lgOutside.Name);
-
-        if (lgCommands != null)
-        {
-            foreach (var ird in lgCommands.Values)
-            {
-                mainForm.CommandList.Add(ird);
-            }
-        }
-        if (lgCommandSequences != null)
-        {
-            foreach (var kv in lgCommandSequences)
-            {
-                var ird = new IRData(0, 0, 0);
-                ird.CommandAlias = kv.Key;
-                mainForm.CommandList.Add(ird);
-            }
-        }
-
-        foreach (var kv in MediaPlayerShortcuts)
-            mainForm.ShortcutsList.Add(kv);
-
-        mainForm.SendIRCommand += (sender, eargs) =>
-        {
-            Console.WriteLine("{0} sending {1}", eargs.Device, eargs.Command);
-            try
-            {
-                SendIRCommand(eargs.Device, eargs.Command);
-            }
-            catch (Exception e)
-            {
-                //mainForm.ShowError(e);
-                if (IsMainFormActive)
-                {
-                    mainForm.UpdateErrors(ErrorReport);
-                    mainForm.ShowError(e);
-                }
-            }
-        };
-
-        mainForm.SendKeysCommand += (Senders, keys2send) =>
-        {
-            Console.WriteLine("Sending {0} media player", keys2send);
-            try
-            {
-                SendKeysToMediaPlayer(keys2send);
-            }
-            catch (Exception e)
-            {
-                //mainForm.ShowError(e);
-                if (IsMainFormActive)
-                {
-                    mainForm.UpdateErrors(ErrorReport);
-                    mainForm.ShowError(e);
-                }
-            }
-        };
-
-        mainForm.Activated += (sender, eargs) =>
-        {
-            mainForm.UpdateStatus(StatusReport);
-            mainForm.UpdateErrors(ErrorReport);
-        };
-
-        return mainForm;
-    }
-
-    async Task<Dictionary<String, IRData>> getIRCommands(String deviceName, String uri)
-    {
-        //TODO: from here should be a func
-        String filename = String.Format("ircommands.{0}.json", deviceName.ToLower().Replace(" ", "-"));
-        String json = String.Empty;
-
-        if (File.Exists(filename))
-        {
-            json = File.ReadAllText(filename);
-        }
-        else
-        {
-            await Task.Run(async () =>
-            {
-                HttpClient client = new HttpClient();
-                var response = await client.GetAsync(uri);
-                json = await response.Content.ReadAsStringAsync();
-
-                if (!String.IsNullOrEmpty(json))
-                {
-                    File.WriteAllText(filename, json);
-                }
-            });
-        }
-
-        if (String.IsNullOrEmpty(json))
-        {
-            throw new Exception(String.Format("No commands found for device: {0}", deviceName));
-        }
-        var result = JsonSerializer.Deserialize<List<IRData>>(json);
-        if (result == null) throw new Exception("No result from json deserialize");
-
-        return result.ToDictionary(x => x.CommandAlias, x => x);
-    }
-
-
     #region Init and End
     override protected async void InitializeContext(bool asSysTray)
     {
@@ -656,11 +548,116 @@ public class MediaControllerContext : SysTrayApplicationContext
     {
         return false;
     }
-
-
     #endregion
 
     #region Methods
+    protected override Form CreateMainForm()
+    {
+        mainForm = new MainForm();
+
+        mainForm.DeviceList.Add(lgInside.Name);
+        mainForm.DeviceList.Add(lgOutside.Name);
+
+        if (lgCommands != null)
+        {
+            foreach (var ird in lgCommands.Values)
+            {
+                mainForm.CommandList.Add(ird);
+            }
+        }
+        if (lgCommandSequences != null)
+        {
+            foreach (var kv in lgCommandSequences)
+            {
+                var ird = new IRData(0, 0, 0);
+                ird.CommandAlias = kv.Key;
+                mainForm.CommandList.Add(ird);
+            }
+        }
+
+        foreach (var kv in MediaPlayerShortcuts)
+            mainForm.ShortcutsList.Add(kv);
+
+        mainForm.SendIRCommand += (sender, eargs) =>
+        {
+            Console.WriteLine("{0} sending {1}", eargs.Device, eargs.Command);
+            try
+            {
+                SendIRCommand(eargs.Device, eargs.Command);
+            }
+            catch (Exception e)
+            {
+                //mainForm.ShowError(e);
+                if (IsMainFormActive)
+                {
+                    mainForm.UpdateErrors(ErrorReport);
+                    mainForm.ShowError(e);
+                }
+            }
+        };
+
+        mainForm.SendKeysCommand += (Senders, keys2send) =>
+        {
+            Console.WriteLine("Sending {0} media player", keys2send);
+            try
+            {
+                SendKeysToMediaPlayer(keys2send);
+            }
+            catch (Exception e)
+            {
+                //mainForm.ShowError(e);
+                if (IsMainFormActive)
+                {
+                    mainForm.UpdateErrors(ErrorReport);
+                    mainForm.ShowError(e);
+                }
+            }
+        };
+
+        mainForm.Activated += (sender, eargs) =>
+        {
+            mainForm.UpdateStatus(StatusReport);
+            mainForm.UpdateErrors(ErrorReport);
+        };
+
+        return mainForm;
+    }
+
+    async Task<Dictionary<String, IRData>> getIRCommands(String deviceName, String uri)
+    {
+        //TODO: from here should be a func
+        String filename = String.Format("ircommands.{0}.json", deviceName.ToLower().Replace(" ", "-"));
+        String json = String.Empty;
+
+        if (File.Exists(filename))
+        {
+            json = File.ReadAllText(filename);
+        }
+        else
+        {
+            await Task.Run(async () =>
+            {
+                HttpClient client = new HttpClient();
+                var response = await client.GetAsync(uri);
+                json = await response.Content.ReadAsStringAsync();
+
+                if (!String.IsNullOrEmpty(json))
+                {
+                    File.WriteAllText(filename, json);
+                }
+            });
+        }
+
+        if (String.IsNullOrEmpty(json))
+        {
+            throw new Exception(String.Format("No commands found for device: {0}", deviceName));
+        }
+        var result = JsonSerializer.Deserialize<List<IRData>>(json);
+        if (result == null) throw new Exception("No result from json deserialize");
+
+        return result.ToDictionary(x => x.CommandAlias, x => x);
+    }
+
     void SendIRCommand(String device, String command)
     {
         if (board == null)
