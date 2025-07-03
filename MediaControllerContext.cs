@@ -214,7 +214,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             String desc;
             if (LastClientMessageSent != null)
             {
-                dstr = LastClientMessageSent.Created.ToString("yyyyMMddHHmmss");
+                dstr = LastClientMessageSent.Created.ToString("HH:mm:ss");
                 desc = LastClientMessageSent.Type + " to " + LastClientMessageSent.Target;
                 builder.AppendFormat("Last sent on {0}: {1}", dstr, desc);
             } else {
@@ -223,7 +223,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             builder.AppendLine();
             if (LastClientMessageReceived != null)
             {
-                dstr = LastClientMessageReceived.Created.ToString("yyyyMMddHHmmss");
+                dstr = LastClientMessageReceived.Created.ToString("HH:mm:ss");
                 desc = LastClientMessageReceived.Type + " from " + LastClientMessageReceived.Sender;
                 builder.AppendFormat("Last received on {0}: {1}", dstr, desc);
             } else {
@@ -246,7 +246,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             String desc;
             if (LastArduinoMessageSent != null)
             {
-                dstr = LastArduinoMessageSent.Created.ToString("yyyyMMddHHmmss");
+                dstr = LastArduinoMessageSent.Created.ToString("HH:mm:ss");
                 desc = LastArduinoMessageSent.Type + " to " + LastArduinoMessageSent.Target;
                 builder.AppendFormat("Last sent on {0}: {1}", dstr, desc);
             } else {
@@ -255,7 +255,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             builder.AppendLine();
             if (LastArduinoMessageReceived != null)
             {
-                dstr = LastArduinoMessageReceived.Created.ToString("yyyyMMddHHmmss");
+                dstr = LastArduinoMessageReceived.Created.ToString("HH:mm:ss");
                 desc = LastArduinoMessageReceived.Type + " from " + LastArduinoMessageReceived.Sender;
                 builder.AppendFormat("Last received on {0}: {1}", dstr, desc);
             } else {
@@ -576,6 +576,12 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Message handling
     private bool handleClientMessage(Chetch.Messaging.Message message, Chetch.Messaging.Message response)
     {
+        switch (message.Type)
+        {
+            case MessageType.STATUS_REQUEST:
+                return true;
+        }
+
         return false;
     }
     #endregion
