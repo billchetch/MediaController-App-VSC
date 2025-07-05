@@ -50,7 +50,7 @@ public class MediaControllerContext : SysTrayApplicationContext
     static Process? MediaPlayerProcess;
     static Object lockMediaPlayerProcess = new object();
 
-    static Dictionary<String, String>? MediaPlayerShortcuts;
+    static Dictionary<String, int>? MediaPlayerShortcuts;
 
     static Process? GetMediaPlayerProcess()
     {
@@ -292,6 +292,7 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Init and End
     override protected async void InitializeContext(bool asSysTray)
     {
+
         NotifyIconPath = "icon-white.ico";
         NotifyIconText = "Media Controller";
 
@@ -321,7 +322,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 PathToMediaPlayer = mps["PathToMediaPlayer"];
                 MediaPlayerProcessName = mps["MediaPlayerProcessName"];
 
-                MediaPlayerShortcuts = mps.GetSection("Shortcuts").Get<Dictionary<String, String>>();
+                MediaPlayerShortcuts = mps.GetSection("Shortcuts").Get<Dictionary<String, int>>();
             }
             else
             {
@@ -579,6 +580,14 @@ public class MediaControllerContext : SysTrayApplicationContext
         switch (message.Type)
         {
             case MessageType.STATUS_REQUEST:
+                return false;
+
+            case MessageType.COMMAND:
+                if (message.Target == "MediaPlayer")
+                {
+                    String? k2s = message.GetValue("Command").ToString();
+                    SendKeysToMediaPlayer(k2s);
+                }
                 return true;
         }
 

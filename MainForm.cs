@@ -32,7 +32,7 @@ public partial class MainForm : Form
 
     public BindingList<IRData> CommandList { get; } = new BindingList<IRData>();
 
-    public BindingList<KeyValuePair<String, String>> ShortcutsList { get; } = new BindingList<KeyValuePair<String, String>>();
+    public BindingList<KeyValuePair<String, int>> ShortcutsList { get; } = new BindingList<KeyValuePair<String, int>>();
 
 
     public event EventHandler<IRSendArgs>? SendIRCommand;
@@ -88,10 +88,14 @@ public partial class MainForm : Form
         {
             sendShortcutButton.Click += (sender, eargs) =>
             {
-                var keys2send = shortcuts.SelectedValue;
-                if (keys2send != null)
+                try
                 {
-                    SendKeysCommand?.Invoke(this, keys2send.ToString());
+                    var keys2send = shortcuts.SelectedValue.ToString();
+                    SendKeysCommand?.Invoke(this, keys2send);
+                }
+                catch (Exception e)
+                {
+                    ShowError(e.Message);
                 }
             };
         }
