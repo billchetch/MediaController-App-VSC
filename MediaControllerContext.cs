@@ -50,7 +50,7 @@ public class MediaControllerContext : SysTrayApplicationContext
     static Process? MediaPlayerProcess;
     static Object lockMediaPlayerProcess = new object();
 
-    static Dictionary<String, int>? MediaPlayerShortcuts;
+    static Dictionary<String, String>? MediaPlayerShortcuts;
 
     static Process? GetMediaPlayerProcess()
     {
@@ -275,7 +275,12 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     BluetoothSerialConnection? btsc = null;
 
-    Dictionary<String, IRData>? lgCommands;
+    MessageQueue<Chetch.Messaging.Message> inq = new MessageQueue<Chetch.Messaging.Message>(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM,
+                                                                                            MessageEncoding.JSON,
+                                                                                            Chetch.Messaging.Message.Deserialize);
+    
+
+    Dictionary<String, IRData> ? lgCommands;
     Dictionary<String, String>? lgCommandSequences;
 
     MainForm? mainForm;
@@ -322,7 +327,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                 PathToMediaPlayer = mps["PathToMediaPlayer"];
                 MediaPlayerProcessName = mps["MediaPlayerProcessName"];
 
-                MediaPlayerShortcuts = mps.GetSection("Shortcuts").Get<Dictionary<String, int>>();
+                MediaPlayerShortcuts = mps.GetSection("Shortcuts").Get<Dictionary<String, String>>();
             }
             else
             {
@@ -424,9 +429,20 @@ public class MediaControllerContext : SysTrayApplicationContext
                 }
 
                 btsc = new BluetoothSerialConnection(devicePath);
-                Frame btInFrame = new Frame(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM, MessageEncoding.JSON);
-                Frame btOutFrame = new Frame(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM, MessageEncoding.JSON);
-                btInFrame.FrameComplete += (sender, payload) =>
+                btsc.Connected += (sender, connected) =>
+                {
+                    if (connected)
+                    {
+                        inq.Start();
+                    }
+                    else
+                    {
+                        inq.Stop();
+                    }
+                };
+
+
+                /*btInFrame.FrameComplete += (sender, payload) =>
                 {
                     try
                     {
@@ -442,6 +458,8 @@ public class MediaControllerContext : SysTrayApplicationContext
                             LastClientMessageSent = response;
                         }
 
+                        Console.WriteLine("Message {0} received ", message.Type);
+
                         if (IsMainFormActive)
                         {
                             mainForm.UpdateClientMessaging(ClientMessagingReport);
@@ -451,13 +469,13 @@ public class MediaControllerContext : SysTrayApplicationContext
                     {
                         errors["Bluetooth Comms"] = e.Message;
                     }
-                };
+                };*/
 
                 btsc.DataReceived += (sender, data) =>
                 {
                     try
                     {
-                        btInFrame.Add(data);
+                        inq.Add(data);
                     }
                     catch (Exception e)
                     {
@@ -465,7 +483,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                     }
                 };
 
-
+                //connect bluetooth
                 try
                 {
                     btsc.Connect();
@@ -484,6 +502,31 @@ public class MediaControllerContext : SysTrayApplicationContext
         {
             errors["Bluetooth"] = e.Message;
         }
+
+        //configure incoming message queue
+        inq.CanDequeue = () => btsc != null && btsc.IsConnected;
+
+        inq.MessageEnqueued += (sender, message) =>
+        {
+            Console.WriteLine("Message enqueued");
+            
+        };
+
+        inq.Dequeued += (sender, message) =>
+        {
+            Console.WriteLine("Message {0} received and dequeued ", message.Type);
+            LastClientMessageReceived = message;
+            var response = new Chetch.Messaging.Message();
+            /*if (handleClientMessage(message, response))
+            {
+                LastClientMessageSent = response;
+            }*/
+
+            if (IsMainFormActive)
+            {
+                mainForm.UpdateClientMessaging(ClientMessagingReport);
+            }
+        };
 
         //Connect Arduino board
         try
@@ -565,6 +608,8 @@ public class MediaControllerContext : SysTrayApplicationContext
 
             board?.End();
 
+            btsc?.Disconnect();
+
             Thread.Sleep(1000);
         }
         catch { }
@@ -577,18 +622,30 @@ public class MediaControllerContext : SysTrayApplicationContext
     #region Message handling
     private bool handleClientMessage(Chetch.Messaging.Message message, Chetch.Messaging.Message response)
     {
-        switch (message.Type)
+        try
         {
-            case MessageType.STATUS_REQUEST:
-                return false;
+            switch (message.Type)
+            {
+                case MessageType.STATUS_REQUEST:
+                    return false;
 
-            case MessageType.COMMAND:
-                if (message.Target == "MediaPlayer")
-                {
-                    String? k2s = message.GetValue("Command").ToString();
-                    SendKeysToMediaPlayer(k2s);
-                }
-                return true;
+                case MessageType.COMMAND:
+                    if (message.Target == "MediaPlayer")
+                    {
+                        String? shortcut = message.GetValue("Shortcut").ToString();
+                        if (!MediaPlayerShortcuts.ContainsKey(shortcut))
+                        {
+                            throw new Exception(String.Format("Shortcut {0} not found", shortcut));
+                        }
+                        var k2s = MediaPlayerShortcuts[shortcut];
+                        //SendKeysToMediaPlayer(k2s);
+                    }
+                    return true;
+            }
+        }
+        catch (Exception e)
+        {
+            return false;
         }
 
         return false;
@@ -641,12 +698,17 @@ public class MediaControllerContext : SysTrayApplicationContext
             }
         };
 
-        mainForm.SendKeysCommand += (Senders, keys2send) =>
+        mainForm.SendKeysCommand += (Senders, shortcut) =>
         {
-            Console.WriteLine("Sending {0} media player", keys2send);
+            Console.WriteLine("Sending {0} media player", shortcut);
             try
             {
-                SendKeysToMediaPlayer(keys2send);
+                if (!MediaPlayerShortcuts.ContainsKey(shortcut))
+                {
+                    throw new Exception(String.Format("Shortcut {0} not found", shortcut));
+                }
+                var k2s = MediaPlayerShortcuts[shortcut];
+                SendKeysToMediaPlayer(k2s);
             }
             catch (Exception e)
             {
@@ -767,7 +829,7 @@ public class MediaControllerContext : SysTrayApplicationContext
             StartMediaPlayerProcess();
         }
 
-        SendKeys.Send(keys);
+        SendKeys.SendWait(keys);
     }
     #endregion
 }

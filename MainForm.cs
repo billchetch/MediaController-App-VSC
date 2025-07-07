@@ -32,7 +32,7 @@ public partial class MainForm : Form
 
     public BindingList<IRData> CommandList { get; } = new BindingList<IRData>();
 
-    public BindingList<KeyValuePair<String, int>> ShortcutsList { get; } = new BindingList<KeyValuePair<String, int>>();
+    public BindingList<KeyValuePair<String, String>> ShortcutsList { get; } = new BindingList<KeyValuePair<String, String>>();
 
 
     public event EventHandler<IRSendArgs>? SendIRCommand;
