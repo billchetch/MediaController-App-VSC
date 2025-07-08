@@ -214,17 +214,17 @@ public class MediaControllerContext : SysTrayApplicationContext
             String desc;
             if (LastClientMessageSent != null)
             {
-                dstr = LastClientMessageSent.Created.ToString("HH:mm:ss");
                 desc = LastClientMessageSent.Type + " to " + LastClientMessageSent.Target;
-                builder.AppendFormat("Last sent on {0}: {1}", dstr, desc);
+                dstr = (DateTime.Now - LastClientMessageSent.Created).ToString("g");
+                builder.AppendFormat("Last sent {0} {1} ago", dstr, desc);
             } else {
                 builder.Append("No client messages sent");
             }
             builder.AppendLine();
             if (LastClientMessageReceived != null)
             {
-                dstr = LastClientMessageReceived.Created.ToString("HH:mm:ss");
                 desc = LastClientMessageReceived.Type + " from " + LastClientMessageReceived.Sender;
+                dstr = (DateTime.Now - LastClientMessageReceived.Created).ToString("g");
                 builder.AppendFormat("Last received on {0}: {1}", dstr, desc);
             } else {
                 builder.Append("No client messages received");
@@ -265,7 +265,8 @@ public class MediaControllerContext : SysTrayApplicationContext
         }
     }
 
-    protected bool IsMainFormActive => Form.ActiveForm == mainForm && mainForm != null;
+    protected bool IsMainFormActive => mainForm != null && Form.ActiveForm == mainForm;
+    protected bool IsMainFormOpen => mainForm != null && mainForm.WindowState != FormWindowState.Minimized;
     #endregion
 
     #region Fields
@@ -275,9 +276,12 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     BluetoothSerialConnection? btsc = null;
 
-    MessageQueue<Chetch.Messaging.Message> inq = new MessageQueue<Chetch.Messaging.Message>(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM,
+    MessageQueue<Chetch.Messaging.Message> qin = new MessageQueue<Chetch.Messaging.Message>(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM,
                                                                                             MessageEncoding.JSON,
                                                                                             Chetch.Messaging.Message.Deserialize);
+    MessageQueue<Chetch.Messaging.Message> qout = new MessageQueue<Chetch.Messaging.Message>(Frame.FrameSchema.MEDIUM_SIMPLE_CHECKSUM,
+                                                                                            MessageEncoding.JSON,
+                                                                                            Chetch.Messaging.Message.Serialize);
     
 
     Dictionary<String, IRData> ? lgCommands;
@@ -289,7 +293,7 @@ public class MediaControllerContext : SysTrayApplicationContext
 
     OLEDTextDisplay oled = new OLEDTextDisplay(OLED_ID, "oled");
     IRTransmitter lgInside = new IRTransmitter(LG_INSIDE_ID, "lgin", "LG Inside");
-    IRTransmitter lgOutside = new IRTransmitter(LG_OUTSIDE_ID, "lgin", "LG Outside");
+    IRTransmitter lgOutside = new IRTransmitter(LG_OUTSIDE_ID, "lgout", "LG Outside");
 
     ArduinoBoard board = new ArduinoBoard("mc");
     #endregion
@@ -400,7 +404,7 @@ public class MediaControllerContext : SysTrayApplicationContext
                         LastClientMessageSent = response;
                     }
 
-                    if (IsMainFormActive)
+                    if (IsMainFormOpen)
                     {
                         mainForm.UpdateClientMessaging(ClientMessagingReport);
                     }
@@ -433,49 +437,18 @@ public class MediaControllerContext : SysTrayApplicationContext
                 {
                     if (connected)
                     {
-                        inq.Start();
+                        qin.Start();
                     }
                     else
                     {
-                        inq.Stop();
+                        qin.Stop();
                     }
                 };
-
-
-                /*btInFrame.FrameComplete += (sender, payload) =>
-                {
-                    try
-                    {
-                        var json = Chetch.Utilities.Convert.ToString(payload);
-                        var message = Chetch.Messaging.Message.Deserialize(json);
-                        LastClientMessageReceived = message;
-                        var response = new Chetch.Messaging.Message();
-                        if (handleClientMessage(message, response))
-                        {
-                            json = response.Serialize();
-                            btOutFrame.Payload = Chetch.Utilities.Convert.ToBytes(json);
-                            btsc.SendData(btOutFrame.GetBytes().ToArray());
-                            LastClientMessageSent = response;
-                        }
-
-                        Console.WriteLine("Message {0} received ", message.Type);
-
-                        if (IsMainFormActive)
-                        {
-                            mainForm.UpdateClientMessaging(ClientMessagingReport);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        errors["Bluetooth Comms"] = e.Message;
-                    }
-                };*/
-
                 btsc.DataReceived += (sender, data) =>
                 {
                     try
                     {
-                        inq.Add(data);
+                        qin.Add(data);
                     }
                     catch (Exception e)
                     {
@@ -504,25 +477,19 @@ public class MediaControllerContext : SysTrayApplicationContext
         }
 
         //configure incoming message queue
-        inq.CanDequeue = () => btsc != null && btsc.IsConnected;
-
-        inq.MessageEnqueued += (sender, message) =>
-        {
-            Console.WriteLine("Message enqueued");
-            
-        };
-
-        inq.Dequeued += (sender, message) =>
+        qin.CanDequeue = () => btsc != null && btsc.IsConnected;
+        qin.Dequeued += (sender, message) =>
         {
             Console.WriteLine("Message {0} received and dequeued ", message.Type);
             LastClientMessageReceived = message;
             var response = new Chetch.Messaging.Message();
-            /*if (handleClientMessage(message, response))
+            if (handleClientMessage(message, response))
             {
-                LastClientMessageSent = response;
-            }*/
+                //LastClientMessageSent = response;
+                //outq.Enqueue(response);
+            }
 
-            if (IsMainFormActive)
+            if (IsMainFormOpen)
             {
                 mainForm.UpdateClientMessaging(ClientMessagingReport);
             }
@@ -613,7 +580,6 @@ public class MediaControllerContext : SysTrayApplicationContext
             Thread.Sleep(1000);
         }
         catch { }
-        ;
 
         base.ExitThreadCore();
     }
@@ -638,7 +604,18 @@ public class MediaControllerContext : SysTrayApplicationContext
                             throw new Exception(String.Format("Shortcut {0} not found", shortcut));
                         }
                         var k2s = MediaPlayerShortcuts[shortcut];
-                        //SendKeysToMediaPlayer(k2s);
+                        SendKeysToMediaPlayer(k2s);
+                    }
+                    else
+                    {
+                        var dev = board.GetDevice(message.Target);
+                        if (dev == null)
+                        {
+                            throw new Exception(String.Format("No device with SID {0}", message.Target));
+                        }
+                        IRTransmitter irt = (IRTransmitter)dev;
+
+                        //irt.Transmit(ird);
                     }
                     return true;
             }
