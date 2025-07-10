@@ -504,6 +504,10 @@ public class MediaControllerContext : SysTrayApplicationContext
                 try
                 {
                     //Add devices
+                    board.AddDevice(oled);
+                    board.AddDevice(lgInside);
+                    board.AddDevice(lgOutside);
+                    //board.AddDevice(irReceiver);
 
                     //Connection
                     var path2device = cnnConfig["PathToDevice"];
@@ -577,6 +581,8 @@ public class MediaControllerContext : SysTrayApplicationContext
 
             btsc?.Disconnect();
 
+            timer?.Stop();
+            
             Thread.Sleep(1000);
         }
         catch { }
@@ -614,8 +620,31 @@ public class MediaControllerContext : SysTrayApplicationContext
                             throw new Exception(String.Format("No device with SID {0}", message.Target));
                         }
                         IRTransmitter irt = (IRTransmitter)dev;
+                        String cmd = message.Get<String>("Alias");
 
-                        //irt.Transmit(ird);
+                        //now we look for the command
+                        List<String> cmds = new List<String>();
+                        if (lgCommandSequences.ContainsKey(cmd))
+                        {
+                            cmds.AddRange(lgCommandSequences[cmd].Split(","));
+                        }
+                        else
+                        {
+                            cmds.Add(cmd);
+                        }
+                        
+                        List<IRData> ird2send = new List<IRData>();
+                        foreach (var key in cmds)
+                        {
+                            if (lgCommands.ContainsKey(key))
+                            {
+                                ird2send.Add(lgCommands[key]);
+                            }
+                            if (ird2send.Count > 0)
+                            {
+                                irt.TransmitAsync(ird2send, 250);
+                            }
+                        }
                     }
                     return true;
             }
